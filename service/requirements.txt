@@ -1,0 +1,4 @@
+fastapi
+uvicorn[standard]
+httpx
+# Opsional, untuk retrieval: pip install chromadb

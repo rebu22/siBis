@@ -25,7 +25,7 @@ Format: pakai `.md` ini, bukan `.txt` — render rapi di GitHub, bisa checklist,
 2. UC-07/08/09/10/11 chat AI + history + rating + lapor jawaban
 3. UC-12/13 premium + monitoring pembayaran
 4. UC-14..18 admin CMS (upload PDF KB, CRUD artikel, edit profil)
-5. UC-19/20 publik + UC-21..24 bug/pesan
+5. UC-19/20 publik + UC-21..25 bug/pesan + hapus dokumen hukum
 
 ## Fase 4 — NFR / QA
 - Home ≤5 dtk, chat ≤10 dtk, 24x7, responsif 360px, Chrome/FF/Edge/Safari

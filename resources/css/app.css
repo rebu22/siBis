@@ -1,0 +1,160 @@
+/* Plus Jakarta Sans (prompt.txt) = satu-satunya font di sistem. Self-hosted lewat
+   @fontsource-variable supaya tidak melanggar CSP `default-src 'self'`. */
+@import '@fontsource-variable/plus-jakarta-sans';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Kelas bersama didefinisikan sekali di sini supaya tombol/kartu/input tidak
+   di-copy paste dengan gaya berbeda antar halaman. */
+@layer components {
+    .eyebrow {
+        @apply text-caption font-semibold uppercase tracking-eyebrow text-indigo-600;
+    }
+
+    /* Prompt: tombol primer = gradient indigo→violet, pill, lift saat hover. */
+    .btn-primary {
+        @apply inline-flex items-center justify-center gap-2 rounded-full
+            bg-gradient-to-r from-indigo-600 to-violet-600 px-6 py-3 text-body-sm
+            font-semibold text-white shadow-button transition-all duration-200
+            hover:-translate-y-0.5 hover:shadow-button-hover
+            focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500
+            focus-visible:ring-offset-2
+            disabled:pointer-events-none disabled:opacity-50 disabled:shadow-none;
+    }
+
+    /* Tombol sekunder: putih + border tipis, hover menggelap. */
+    .btn-ghost {
+        @apply inline-flex items-center justify-center gap-2 rounded-full border
+            border-slate-200 bg-white px-6 py-3 text-body-sm font-semibold text-slate-700
+            shadow-sm transition-all duration-200 hover:bg-slate-50 hover:border-slate-300
+            focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500
+            focus-visible:ring-offset-2
+            disabled:pointer-events-none disabled:opacity-50;
+    }
+
+    .btn-sm {
+        @apply px-4 py-2 text-caption;
+    }
+
+    /* Tombol tanpa border, untuk aksi ringan di dalam kartu. */
+    .btn-quiet {
+        @apply inline-flex items-center gap-1.5 text-body-sm font-semibold text-slate-500
+            transition-colors duration-200 hover:text-indigo-600
+            focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500
+            focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50;
+    }
+
+    /* Prompt: kartu putih, rounded-xl, bayangan ber-tint indigo, naik saat hover. */
+    .card {
+        @apply rounded-card border border-slate-100 bg-white shadow-soft
+            transition-all duration-200 hover:-translate-y-1 hover:shadow-soft-hover;
+    }
+
+    .badge {
+        @apply inline-flex items-center gap-1.5 rounded-full bg-indigo-50 px-3 py-1
+            text-caption font-semibold text-indigo-600;
+    }
+
+    /* Prompt: input putih, rounded-lg, fokus ring indigo, label tebal.
+       Dua penyimpangan sadar dari prompt, keduanya demi WCAG AA (NFR-25):
+       border slate-300 (bukan slate-200) agar kotak isian lebih terbedakan dari latar,
+       dan placeholder slate-500 (bukan slate-400) karena 2.56:1 gagal AA. */
+    .input {
+        @apply block w-full rounded-lg border-slate-300 bg-white px-4 py-3 text-body-sm
+            text-slate-900 placeholder-slate-500 transition
+            focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500;
+    }
+
+    .nav-link {
+        @apply text-body-sm font-medium text-slate-600 transition-colors duration-200
+            hover:text-indigo-600;
+    }
+
+    .nav-link-active {
+        @apply text-body-sm font-semibold text-indigo-600;
+    }
+
+    .link-quiet {
+        @apply font-medium text-indigo-600 transition-colors duration-200 hover:text-indigo-800
+            focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500
+            focus-visible:ring-offset-2;
+    }
+
+    .hairline {
+        @apply border-t border-slate-200;
+    }
+
+    /* Prompt: gradient text untuk penekanan di judul. */
+    .gradient-text {
+        @apply bg-gradient-to-r from-indigo-600 to-violet-600 bg-clip-text text-transparent;
+    }
+
+    /* Prompt: "soft blobs" 400-600px dengan blur berat sebagai kedalaman atmosfer. */
+    .orb {
+        @apply pointer-events-none absolute -z-10 rounded-full blur-3xl;
+    }
+}
+
+@layer base {
+    body {
+        @apply bg-slate-50 font-sans text-slate-900 antialiased;
+    }
+
+    ::selection {
+        @apply bg-indigo-600 text-white;
+    }
+
+    /* NFR-25/WCAG: tetap ada penanda fokus, jangan pernah dihapus. */
+    :focus-visible {
+        @apply outline-none ring-2 ring-indigo-500 ring-offset-2;
+    }
+}
+
+/* Prompt §4: isometrik. Tailwind v3 belum punya utilitas perspective/rotate-x/y
+   (itu v4), jadi ditulis manual di sini alih-alih menambah plugin. */
+.iso-parent {
+    perspective: 2000px;
+}
+
+.iso-card {
+    transform: rotateX(5deg) rotateY(-12deg);
+    transition: transform 200ms ease-out;
+}
+
+.iso-card:hover {
+    transform: rotateX(2deg) rotateY(-8deg);
+}
+
+.iso-left {
+    transform: rotateY(6deg);
+}
+
+.iso-right {
+    transform: rotateY(-6deg);
+}
+
+/* Prompt §6: hormati pengguna yang sensitif terhadap animasi. */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
+
+    .card:hover,
+    .btn-primary:hover {
+        transform: none;
+    }
+
+    .iso-card,
+    .iso-card:hover,
+    .iso-left,
+    .iso-right {
+        transform: none;
+    }
+}

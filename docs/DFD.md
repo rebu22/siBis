@@ -74,4 +74,5 @@ flowchart LR
 Aturan dari SRS: kuota dicek dulu (UC-07). Gagal AI = coba lagi tanpa potong kuota. Tanpa rujukan KB = jangan mengarang, tampilkan keterbatasan. Tiap jawaban: ringkasan awam + dasar hukum (nama+nomor+tahun) + disclaimer edukasi. Log req/res + latensi tanpa data sensitif (NFR-18/19).
 
 ## Traceability singkat
+
 RF-01→P5/P3, RF-02/03/04→P5, RF-05/06→P2, RF-07→P4, RF-08→P5/P6, RF-09→P5/P6, RF-10..13→P1, RF-14/15/16→P3, RF-17→P3, RF-18→P3, RF-19/20→P6, RF-21→P4/P6.
