@@ -30,3 +30,7 @@ Thumbs.db
 
 # screenshot kerja (tidak ikut repo)
 /.shots
+
+# python
+__pycache__/
+*.pyc

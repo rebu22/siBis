@@ -66,7 +66,7 @@ def _collection():
         return None
 
     try:
-        return chromadb.PersistentClient(path=CHROMA_PATH).get_collection(COLLECTION)
+        return chromadb.PersistentClient(path=CHROMA_PATH).get_or_create_collection(COLLECTION)
     except Exception:
         return None
 
