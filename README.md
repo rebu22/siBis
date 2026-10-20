@@ -86,8 +86,20 @@ dan menampilkan pesan fallback — tidak error.
 4. Dashboard admin menampilkan jumlah pengguna, sesi chat, pesan, laporan berstatus `baru`,
    jumlah artikel, dan 10 laporan terbaru.
 
-CMS admin yang lengkap (CRUD artikel dan unggah PDF regulasi) belum dibangun; halaman admin
-saat ini berupa ringkasan supaya alur OTP dan area admin bisa diuji dari ujung ke ujung.
+5. **Pengguna** `/admin/pengguna` — daftar akun beserta paket, pemakaian kuota hari ini,
+   status verifikasi, dan jumlah percakapan. Bisa dicari lewat nama atau email.
+6. **Artikel** `/admin/artikel` — tulis, ubah, terbitkan, dan hapus artikel. Slug dibuat
+   otomatis dari judul dan dibuat unik; artikel berstatus draf tidak tampil di `/artikel`.
+
+Yang belum dibangun: unggah PDF regulasi ke basis pengetahuan, monitoring pembayaran premium,
+laporan bug, dan pesan pengguna ke admin. Bagian itu sengaja tidak diberi tombol supaya tidak
+menyesatkan.
+
+Untuk menjadikan akun lain sebagai admin:
+
+```sh
+php artisan tinker --execute='\App\Models\User::where("email","alamat@contoh.com")->first()->forceFill(["role"=>"admin"])->save();'
+```
 
 ## Struktur singkat
 

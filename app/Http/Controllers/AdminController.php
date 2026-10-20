@@ -17,8 +17,8 @@ use Inertia\Inertia;
 use Inertia\Response;
 
 /**
- * UC-03 + dasbor admin. CMS penuh (CRUD artikel, unggah PDF) belum dibangun — halaman ini
- * hanya menampilkan ringkasan supaya area admin dan alur OTP bisa diuji end-to-end.
+ * UC-03 + area admin: dasbor, gerbang OTP, monitoring pengguna, dan CRUD artikel.
+ * Yang belum dibangun: unggah PDF ke basis pengetahuan, monitoring pembayaran, laporan bug.
  */
 class AdminController extends Controller
 {
@@ -92,6 +92,131 @@ class AdminController extends Controller
         $user->forceFill(['two_factor_at' => now()])->save();
 
         return redirect()->route('admin.dashboard')->with('success', 'Verifikasi dua faktor berhasil.');
+    }
+
+    /** RF-18: monitoring pengguna — paket, pemakaian kuota hari ini, jumlah percakapan. */
+    public function users(Request $request): Response
+    {
+        $search = trim((string) $request->query('q', ''));
+
+        $users = User::query()
+            ->when($search !== '', fn ($query) => $query->where(
+                fn ($inner) => $inner
+                    ->where('name', 'like', "%{$search}%")
+                    ->orWhere('email', 'like', "%{$search}%")
+            ))
+            ->withCount('chatSessions')
+            ->latest('id')
+            ->paginate(20)
+            ->withQueryString()
+            ->through(fn (User $user) => [
+                'id' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+                'role' => $user->role,
+                'plan' => (string) $user->plan,
+                'verified' => $user->email_verified_at?->toDateString(),
+                'quota_used' => $user->quota_date?->isToday() ? $user->quota_used : 0,
+                'quota_limit' => $user->dailyQuota(),
+                'sessions' => $user->chat_sessions_count,
+                'joined' => $user->created_at?->toDateString(),
+            ]);
+
+        return Inertia::render('Admin/Users', [
+            'users' => $users,
+            'search' => $search,
+            'summary' => [
+                'total' => User::query()->count(),
+                'verified' => User::query()->whereNotNull('email_verified_at')->count(),
+                'premium' => User::query()->where('plan', 'premium')->count(),
+                'asked_today' => (int) User::query()->whereDate('quota_date', now()->toDateString())->sum('quota_used'),
+            ],
+        ]);
+    }
+
+    /** RF-14: daftar artikel untuk CMS. Isi penuh ikut dikirim karena form ubah memakainya. */
+    public function articles(): Response
+    {
+        $articles = Article::query()
+            ->latest('id')
+            ->take(60)
+            ->get()
+            ->map(fn (Article $article) => [
+                'id' => $article->id,
+                'title' => $article->title,
+                'slug' => $article->slug,
+                'category' => $article->category,
+                'excerpt' => $article->excerpt,
+                'body' => $article->body,
+                'status' => $article->status,
+                'published_at' => $article->published_at?->toDateString(),
+                'updated_at' => $article->updated_at?->toDateTimeString(),
+            ]);
+
+        return Inertia::render('Admin/Articles', ['articles' => $articles]);
+    }
+
+    public function storeArticle(Request $request): RedirectResponse
+    {
+        $data = $this->validatedArticle($request);
+        $data['user_id'] = $request->user()->id;
+        $data['published_at'] = $data['status'] === 'published' ? now() : null;
+
+        Article::create($data);
+
+        return back()->with('success', 'Artikel tersimpan.');
+    }
+
+    public function updateArticle(Request $request, Article $article): RedirectResponse
+    {
+        $data = $this->validatedArticle($request, $article);
+
+        if ($data['status'] === 'published' && $article->published_at === null) {
+            $data['published_at'] = now();
+        }
+
+        $article->update($data);
+
+        return back()->with('success', 'Perubahan artikel tersimpan.');
+    }
+
+    public function destroyArticle(Article $article): RedirectResponse
+    {
+        $article->delete();
+
+        return back()->with('success', 'Artikel dihapus.');
+    }
+
+    /**
+     * Slug dibuat unik di sini, bukan lewat aturan unique, karena slug boleh dikosongkan
+     * dan diambil dari judul. Hasilnya: "judul-sama", "judul-sama-2", dst.
+     */
+    private function validatedArticle(Request $request, ?Article $article = null): array
+    {
+        $data = $request->validate([
+            'title' => ['required', 'string', 'max:160'],
+            'slug' => ['nullable', 'string', 'max:160', 'alpha_dash'],
+            'category' => ['nullable', 'string', 'max:60'],
+            'excerpt' => ['nullable', 'string', 'max:300'],
+            'body' => ['required', 'string', 'min:40', 'max:20000'],
+            'status' => ['required', 'in:draft,published'],
+        ]);
+
+        $base = ($data['slug'] ?? null) ?: Str::slug($data['title']);
+        $base = $base !== '' ? $base : 'artikel';
+        $slug = $base;
+        $suffix = 2;
+
+        while (Article::query()
+            ->when($article !== null, fn ($query) => $query->whereKeyNot($article->id))
+            ->where('slug', $slug)
+            ->exists()) {
+            $slug = $base.'-'.$suffix++;
+        }
+
+        $data['slug'] = $slug;
+
+        return $data;
     }
 
     /** Hanya tampilkan bentuk samar email di UI supaya alamat lengkap tidak dirender di halaman. */

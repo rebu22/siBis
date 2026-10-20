@@ -1,6 +1,6 @@
 <script setup>
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
-import { Head } from '@inertiajs/vue3';
+import { Head, Link } from '@inertiajs/vue3';
 
 defineProps({
     stats: { type: Object, required: true },
@@ -18,7 +18,6 @@ const LABELS = {
 // Bagian yang UI-nya disiapkan tetapi backend-nya belum dibangun.
 const PENDING = [
     'Unggah PDF regulasi ke basis pengetahuan',
-    'Tambah dan ubah artikel',
     'Monitoring pembayaran premium',
     'Laporan bug dari pengguna',
     'Pesan pengguna ke admin',
@@ -67,6 +66,34 @@ const PENDING = [
                     <dd class="mt-2 text-h-md font-bold text-slate-900">{{ value }}</dd>
                 </div>
             </dl>
+
+            <section class="mt-12">
+                <p class="eyebrow">Kelola</p>
+                <div class="mt-4 grid gap-px overflow-hidden rounded-card border border-slate-100 bg-slate-100 sm:grid-cols-2">
+                    <Link
+                        :href="route('admin.users')"
+                        class="group bg-white p-6 transition-colors duration-200 hover:bg-slate-50"
+                    >
+                        <p class="text-sub-sm font-semibold text-slate-900 group-hover:text-indigo-600">
+                            Pengguna
+                        </p>
+                        <p class="mt-2 text-body-sm text-slate-500">
+                            Paket, kuota hari ini, dan status verifikasi tiap akun.
+                        </p>
+                    </Link>
+                    <Link
+                        :href="route('admin.articles')"
+                        class="group bg-white p-6 transition-colors duration-200 hover:bg-slate-50"
+                    >
+                        <p class="text-sub-sm font-semibold text-slate-900 group-hover:text-indigo-600">
+                            Artikel
+                        </p>
+                        <p class="mt-2 text-body-sm text-slate-500">
+                            Tulis, ubah, dan terbitkan artikel untuk halaman publik.
+                        </p>
+                    </Link>
+                </div>
+            </section>
 
             <section class="mt-12">
                 <p class="eyebrow">Laporan jawaban terbaru</p>

@@ -32,6 +32,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
 // --- Admin (UC-03) ---
 Route::middleware(['auth', 'verified', 'admin'])->prefix('admin')->group(function () {
     Route::get('/', [AdminController::class, 'dashboard'])->name('admin.dashboard');
+    Route::get('/pengguna', [AdminController::class, 'users'])->name('admin.users');
+
+    Route::get('/artikel', [AdminController::class, 'articles'])->name('admin.articles');
+    Route::post('/artikel', [AdminController::class, 'storeArticle'])->name('admin.articles.store');
+    Route::patch('/artikel/{article}', [AdminController::class, 'updateArticle'])->name('admin.articles.update');
+    Route::delete('/artikel/{article}', [AdminController::class, 'destroyArticle'])->name('admin.articles.destroy');
     Route::get('/verifikasi', [AdminController::class, 'showTwoFactor'])->name('admin.2fa');
     Route::post('/verifikasi/kirim', [AdminController::class, 'sendOtp'])->middleware('throttle:6,1')->name('admin.2fa.send');
     Route::post('/verifikasi', [AdminController::class, 'verifyOtp'])->name('admin.2fa.verify');
