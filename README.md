@@ -4,8 +4,7 @@ Company profile + chatbot konsultasi awal hukum bisnis untuk pelaku usaha di Ind
 (perpajakan, perizinan berusaha, pendirian badan usaha). Setiap jawaban wajib menyertakan
 dasar hukum dan disclaimer bahwa ini bukan pengganti advokat.
 
-Dokumen acuan: `SRS_11241029.pdf` (sumber kebenaran), `SDD_siBis_11241029.docx`,
-diagram `Usecase_siBis.drawio.png` dan `docs/DFD.md`.
+Panduan bahan presentasi ada di `PANDUAN_PRESENTASI.txt`.
 
 Tumpukan: Laravel + Inertia + Vue 3 + Tailwind, basis data SQLite, dan microservice
 Python FastAPI opsional di `service/`.

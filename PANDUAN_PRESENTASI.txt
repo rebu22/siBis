@@ -1,0 +1,328 @@
+PANDUAN PRESENTASI siBis
+Sistem Informasi Konsultasi Hukum Bisnis
+=========================================
+
+Dokumen ini untuk persiapan presentasi: latar belakang, tujuan, arsitektur,
+bagian AI, angka yang boleh dikutip, skrip demo, dan kemungkinan pertanyaan
+penguji. Semua isi di sini bisa dibuktikan dari kode di repositori ini.
+
+
+1. JAWABAN 30 DETIK PERTAMA
+---------------------------
+siBis adalah aplikasi web yang membantu pelaku usaha kecil di Indonesia
+memahami hukum bisnis dasar sebelum berkonsultasi ke advokat. Pengguna
+bertanya dengan bahasa sehari-hari, aplikasi menjawab berdasarkan enam
+peraturan resmi yang benar-benar tersimpan di sistem, dan setiap jawaban
+menyebutkan dasar hukumnya serta menegaskan bahwa itu edukasi, bukan
+nasihat hukum.
+
+Kalimat pembuka yang bisa kamu hafal:
+
+  "Pelaku usaha kecil sering butuh jawaban hukum cepat, tapi biaya advokat
+   mahal dan informasi di internet tidak jelas sumbernya. siBis menjawab
+   pertanyaan awal dengan AI yang hanya boleh menjawab dari peraturan resmi,
+   dan selalu menunjukkan pasal serta sumbernya."
+
+
+2. LATAR BELAKANG
+-----------------
+Masalah yang mau diselesaikan (sebutkan sebagai alasan, bukan sebagai klaim
+kosong):
+
+a. Biaya konsultasi hukum tidak cocok untuk usaha kecil. Pertanyaan
+   sederhana seperti "apa syarat mendirikan PT" atau "apa kewajiban saya
+   soal data pelanggan" harga konsultasinya bisa lebih besar dari modal
+   awal usaha.
+
+b. Informasi hukum di internet tersebar dan tidak bertanggung jawab.
+   Jawaban di forum atau blog sering tanpa dasar pasal, kadang sudah tidak
+   berlaku karena regulasi berubah.
+
+c. Regulasi berubah. UU Cipta Kerja dan aturan turunannya mengubah banyak
+   ketentuan lama, sehingga pemilik usaha tidak tahu mana yang masih
+   berlaku.
+
+d. Banyak pemilik usaha tidak tahu harus mulai dari mana. Mereka butuh
+   penjelasan awal yang rapi, bukan dokumen hukum lengkap.
+
+Kesimpulan latar belakang: yang dibutuhkan bukan pengganti advokat, tapi
+"konsultasi awal" yang cepat, murah, dan selalu menunjukkan sumbernya.
+
+
+3. TUJUAN DAN UNTUK APA APLIKASI INI
+------------------------------------
+Visi (tertulis di profil perusahaan di dalam aplikasi):
+  "Membuat informasi hukum bisnis dasar mudah dijangkau pelaku usaha kecil
+   di Indonesia."
+
+Misi:
+  "Menyediakan konsultasi hukum bisnis berbasis AI yang selalu menyertakan
+   rujukan regulasi, disertai artikel edukasi yang dapat dipahami tanpa
+   latar belakang hukum."
+
+Tiga sasaran yang bisa diukur:
+  1. Pengguna mendapat jawaban awal atas pertanyaan hukum bisnis dalam
+     hitungan detik, lengkap dengan rujukan.
+  2. Setiap jawaban selalu menyebut sumber peraturan, jadi bisa diperiksa
+     sendiri oleh pengguna.
+  3. Pengguna bisa menyimpan riwayat, menilai jawaban, dan melaporkan
+     jawaban yang salah.
+
+
+4. SIAPA PENGGUNANYA
+--------------------
+Ada dua peran:
+
+  Pengguna biasa
+    - mendaftar dan memverifikasi email
+    - bertanya lewat halaman konsultasi
+    - membaca artikel edukasi
+    - membuka riwayat dan menilai atau melaporkan jawaban
+
+  Admin
+    - masuk dengan verifikasi dua langkah berupa kode OTP ke email
+    - melihat ringkasan sistem: jumlah pengguna, sesi, pesan, laporan baru
+    - memantau pengguna: paket, pemakaian kuota hari ini, status verifikasi,
+      jumlah percakapan
+    - menulis, mengubah, menerbitkan, dan menghapus artikel
+
+Pembagian kuota per paket: gratis 5 pertanyaan per hari, premium 100
+pertanyaan per hari.
+
+
+5. FITUR YANG SUDAH JADI
+------------------------
+Yang bisa didemokan hari ini:
+
+  - Beranda profil perusahaan: visi, misi, layanan, kontak, artikel terbaru
+  - Artikel: daftar, pencarian kata kunci, saring per kategori, halaman
+    detail dengan alamat slug
+  - Pendaftaran dengan email verifikasi, login, lupa password
+  - Konsultasi AI dengan riwayat percakapan
+  - Riwayat sesi, penilaian jawaban, pelaporan jawaban tidak akurat
+  - Profil usaha, ganti password, hapus akun beserta datanya
+  - Area admin dengan OTP, dashboard ringkasan, monitoring pengguna,
+    dan CRUD artikel
+
+Yang BELUM jadi, dan sebaiknya kamu sebut lebih dulu sebelum ditanya:
+  - unggah berkas PDF peraturan sendiri lewat admin
+  - monitoring pembayaran paket premium
+  - halaman laporan bug dan pesan pengguna ke admin
+
+Menyebutkan yang belum jadi justru menaikkan kredibilitas. Bagian itu
+sengaja tidak diberi tombol supaya tampilan tidak menjanjikan sesuatu yang
+tidak berfungsi.
+
+
+6. ARSITEKTUR DAN ALASANNYA
+---------------------------
+Satu pertanyaan menempuh empat lapisan:
+
+  Browser (Vue 3)
+       |  POST /konsultasi
+       v
+  Laravel (PHP)  -- controller, kuota, simpan riwayat, otorisasi
+       |  HTTP + token internal -> /rag/ask
+       v
+  FastAPI (Python)  -- ambil potongan peraturan yang relevan, susun prompt
+       |  panggil endpoint kompatibel OpenAI
+       v
+  Model bahasa lokal (Ollama, qwen2.5:3b)
+
+Kenapa dipisah jadi dua aplikasi, bukan satu:
+
+  a. Laravel kuat untuk halaman, login, dan basis data. Python kuat untuk
+     pemrosesan bahasa. Masing-masing dipakai untuk pekerjaan yang cocok.
+
+  b. Kalau layanan AI mati atau lambat, aplikasi utama tetap hidup dan
+     menampilkan pesan fallback. Pengguna tidak melihat halaman error, dan
+     kuotanya tidak terpotong.
+
+  c. Mengganti model cukup dengan mengubah variabel alamat model, tanpa
+     menyentuh kode PHP sama sekali.
+
+Basis data memakai SQLite karena aplikasi berjalan di satu mesin dan tanpa
+server basis data terpisah. Kalau nanti perlu pindah ke MySQL atau
+PostgreSQL, perubahannya cukup di konfigurasi.
+
+
+7. BAGIAN AI: APA YANG SEBENARNYA TERJADI
+-----------------------------------------
+Ini bagian yang paling mungkin ditanya, jadi pahami alurnya, bukan hanya
+istilahnya.
+
+Metodenya bernama RAG (Retrieval-Augmented Generation), artinya "mengambil
+dulu, baru menjawab". Analoginya: asisten yang tidak boleh menjawab dari
+ingatan, hanya boleh membaca buku yang diambilnya dari rak. Kalau bukunya
+tidak ada di rak, ia harus bilang tidak tahu.
+
+Alurnya enam langkah:
+
+  1. Enam dokumen peraturan dipecah jadi potongan teks kecil, lalu diubah
+     menjadi vektor angka dan disimpan di ChromaDB, sebuah basis data vektor.
+     Nama koleksinya: hukum_bisnis.
+  2. Pengguna mengetik pertanyaan di halaman konsultasi.
+  3. Laravel memeriksa kuota, lalu mengirim pertanyaan beserta beberapa
+     giliran percakapan sebelumnya ke layanan Python.
+  4. Di layanan Python, pertanyaan diubah menjadi vektor dengan model
+     embedding (all-MiniLM-L6-v2) dan dicocokkan dengan potongan yang
+     tersimpan. Diambil empat potongan terdekat.
+  5. Empat potongan itu disusun sebagai "KONTEKS" dalam prompt, ditambah
+     aturan yang mengikat model: jawab hanya dari konteks, jangan mengarang
+     pasal, dan kalau konteks tidak memuat jawabannya, katakan terus terang.
+  6. Model menyusun jawaban, lalu Laravel menyimpannya ke riwayat bersama
+     daftar sumbernya.
+
+Apa isi basis pengetahuannya (enam dokumen, semua dari peraturan.go.id dan
+sudah diperiksa dapat diakses):
+
+  - UU 20/2008 tentang Usaha Mikro, Kecil, dan Menengah
+  - PP 7/2021 tentang Kemudahan, Pelindungan, dan Pemberdayaan KUMKM
+  - UU 40/2007 tentang Perseroan Terbatas
+  - UU 27/2022 tentang Pelindungan Data Pribadi
+  - UU 6/2023 tentang Cipta Kerja
+  - PP 5/2021 tentang Penyelenggaraan Perizinan Berusaha (NIB/OSS)
+  
+Modelnya apa: qwen2.5:3b, model terbuka berukuran 3 miliar parameter,
+berjalan di komputer sendiri lewat Ollama. Tidak ada API key, tidak ada
+tagihan, dan data pertanyaan tidak keluar dari mesin.
+
+Pengaturan yang relevan:
+  - suhu 0,2 (rendah, supaya jawaban tidak melebar dan konsisten)
+  - empat sumber teratas yang diambil
+  - batas waktu 30 detik di sisi Laravel
+  - jawaban nyata terukur sekitar 12 detik
+
+Tiga pengaman yang bisa kamu sebut sebagai bentuk tanggung jawab:
+  1. Jawaban dibatasi pada konteks. Bukan model yang bebas mengarang.
+  2. Setiap jawaban menutup dengan kalimat: "Jawaban ini bersifat edukasi,
+     bukan nasihat hukum untuk kasus tertentu."
+  3. Pengguna bisa melaporkan jawaban yang dirasa tidak akurat, dan laporan
+     itu masuk ke dashboard admin untuk ditindaklanjuti.
+
+Kenapa RAG, bukan melatih ulang model sendiri: peraturan berubah. Dengan
+RAG, memperbarui pengetahuan cukup dengan menambah atau mengganti dokumen
+di basis pengetahuan, tanpa melatih ulang model dan tanpa biaya komputasi
+besar. RAG juga membuat sumber jawaban bisa ditunjukkan, sesuatu yang tidak
+didapat kalau model hanya dilatih ulang.
+
+
+8. ANGKA YANG BOLEH DIKUTIP
+---------------------------
+  - 36 test, 207 pemeriksaan, semuanya lulus
+  - 6 dokumen peraturan di basis pengetahuan
+  - jawaban pertama terukur 11,7 detik, 4 sumber dikutip
+  - basis vektor berukuran sekitar 804 KB
+  - kuota 5 pertanyaan per hari untuk paket gratis, 100 untuk premium
+  - kode OTP admin berlaku 5 menit, maksimal 5 percobaan, sesi admin
+    bertahan 30 menit
+
+Jangan menyebut angka yang tidak bisa kamu tunjukkan saat itu. Lebih baik
+mengaku belum mengukur daripada dikejar pertanyaan lanjutan.
+
+
+9. SKRIP DEMO (URUTAN KLIK, 6 LANGKAH)
+--------------------------------------
+  1. Beranda: tunjukkan visi, misi, dan artikel terbaru. Sebut bahwa ini
+     profil perusahaan, bukan hanya halaman pendaratan kosong.
+  2. Artikel: cari satu kata kunci, saring kategori, buka satu detail.
+  3. Konsultasi: ajukan pertanyaan yang sudah kamu siapkan, misalnya
+     "Apa syarat utama untuk mendirikan PT?". Tunggu jawaban. Sorot dua
+     hal: dasar hukum yang disebut dan daftar sumber di bawah jawaban.
+  4. Riwayat: buka sesi tadi, tunjukkan percakapan tersimpan dan tombol
+     penilaian.
+  5. Area admin: masuk, isi kode OTP, tunjukkan dashboard ringkasan,
+     halaman pengguna dengan kuota hari ini, lalu halaman artikel.
+  6. Artikel admin: tulis satu artikel pendek, terbitkan, lalu buka
+     /artikel untuk menunjukkan artikel itu sudah muncul.
+
+Pertanyaan demo yang aman karena benar-benar ada di basis pengetahuan:
+  - "Apa syarat utama untuk mendirikan PT?"
+  - "Apa kewajiban saya melindungi data pelanggan?"
+  - "Bagaimana cara mengurus NIB?"
+
+Siapkan satu pertanyaan di luar topik, misalnya "bagaimana cara mengurus
+izin usaha di luar negeri", untuk membuktikan sistem berani bilang tidak
+tahu. Ini justru poin kuat, bukan kelemahan.
+
+
+10. KEMUNGKINAN PERTANYAAN PENGUJI
+---------------------------------
+T: Kenapa tidak memakai ChatGPT atau API berbayar saja?
+J: Tiga alasan. Biaya per pertanyaan tidak cocok untuk paket gratis, data
+   pengguna akan keluar ke pihak ketiga, dan untuk data bisnis yang
+   sesekali sensitif itu tidak dapat diterima. Model lokal membuat data
+   tidak keluar dari mesin. Karena antarmuka modelnya mengikuti standar
+   OpenAI, mengganti penyedia nanti hanya soal mengubah tiga variabel
+   konfigurasi, tanpa mengubah kode.
+
+T: Bagaimana mencegah AI mengarang jawaban?
+J: Model tidak diberi kebebasan menjawab dari ingatannya. Ia hanya menerima
+   empat potongan peraturan yang relevan dan diperintahkan menjawab dari
+   situ, menyebut dasar hukum yang benar-benar ada, dan mengaku kalau
+   konteksnya tidak memuat jawaban. Setiap jawaban juga menampilkan sumber
+   agar bisa diperiksa, dan ada tombol lapor kalau pengguna menemukan
+   kekeliruan.
+
+T: Apa bedanya RAG dengan melatih model sendiri?
+J: Melatih ulang mahal dan cepat basi karena peraturan berubah. RAG
+   menyimpan pengetahuan di luar model, jadi pembaruan cukup mengganti
+   dokumen. RAG juga bisa menunjukkan sumber, sedangkan model yang dilatih
+   ulang tidak.
+
+T: Bagaimana kalau layanan AI mati?
+J: Laravel tidak melempar error ke pengguna. Layanan mengembalikan jawaban
+   berstatus degraded: aplikasi tetap merespons, memberi tahu bahwa
+   jawaban otomatis sedang tidak tersedia, dan kuota pengguna tidak
+   dipotong karena tidak ada jawaban nyata yang diberikan.
+
+T: Kenapa dua bahasa pemrograman, tidak boros?
+J: Justru memisahkan tanggung jawab. Halaman, login, dan basis data di
+   Laravel; pemrosesan bahasa di Python. Kalau salah satu bermasalah, yang
+   lain tetap jalan. Menggabungkan keduanya akan membuat satu kegagalan
+   menjatuhkan seluruh aplikasi.
+
+T: Apakah ini menggantikan advokat?
+J: Tidak, dan aplikasi menyatakannya sendiri di setiap jawaban. Posisinya
+   konsultasi awal: membantu pengguna memahami istilah dan langkah dasar
+   sebelum menemui advokat, sehingga waktu konsultasi lebih efisien.
+
+T: Kenapa admin butuh OTP, padahal ini hanya aplikasi kecil?
+J: Akun admin bisa mengubah isi artikel dan melihat data pengguna. Kalau
+   password-nya bocor, OTP mencegah orang lain langsung masuk. Ini praktik
+   yang murah dan hasilnya nyata.
+
+T: Apa kekurangan sistem ini?
+J: Model 3 miliar parameter cukup untuk jawaban ringkas, tetapi bukan yang
+   terbaik untuk penalaran panjang. Basis pengetahuan baru enam dokumen,
+   dan belum ada antarmuka untuk mengunggah peraturan sendiri. Model ini
+   juga melayani satu permintaan sekaligus, jadi tiga pengguna bersamaan
+   berisiko menunggu. Semua ini sudah tercatat sebagai pekerjaan lanjutan.
+
+
+11. YANG HARUS DIKATAKAN JUJUR KALAU DITANYA
+-------------------------------------------
+  a. Aplikasi belum dipasang di internet; saat ini berjalan di komputer
+     sendiri.
+  b. Pengiriman email verifikasi belum berfungsi penuh karena kredensial
+     SMTP belum benar, sehingga kode verifikasi masih terbaca dari log.
+  c. Model qwen2.5:3b berlisensi riset, aman untuk tugas akademik, tetapi
+     untuk layanan berbayar sebaiknya diganti versi berlisensi Apache.
+  d. Tiga proses (aplikasi, layanan AI, model) masih dinyalakan manual dan
+     belum punya penjalan otomatis.
+
+Mengakui empat hal ini dengan tenang akan lebih dihargai daripada berpura-
+pura semuanya selesai.
+
+
+12. PEMBAGIAN WAKTU 7 MENIT
+---------------------------
+  menit 0-1  : masalah dan mengapa penting (bagian 2)
+  menit 1-2  : tujuan dan pengguna (bagian 3 dan 4)
+  menit 2-3  : arsitektur empat lapis (bagian 6)
+  menit 3-5  : demo langsung (bagian 9)
+  menit 5-6  : bagian AI, alasan RAG (bagian 7)
+  menit 6-7  : batasan dan rencana lanjutan (bagian 11)
+
+Kalau waktu terbatas, yang tidak boleh dipotong: demo konsultasi dan satu
+kalimat penjelasan RAG. Sisanya bisa diringkas.

@@ -4,13 +4,13 @@ set -euo pipefail
 cd "$(dirname "$0")"
 
 REPO="$(cd .. && pwd)"
-RAG_TOKEN="$(grep -E '^RAG_TOKEN=' "$REPO/.env" | cut -d= -f2- | tr -d '"')"
+RAG_TOKEN="$(grep -E '^RAG_TOKEN=' "$REPO/.env" | cut -d= -f2- | tr -d '"' || true)"
 [ -n "$RAG_TOKEN" ] || { echo "RAG_TOKEN kosong di $REPO/.env" >&2; exit 1; }
 export RAG_TOKEN
 
 # Kalau .env sudah berisi LLM_* (mis. API gratis), pakai itu dan Ollama dilewati.
 for k in LLM_BASE_URL LLM_API_KEY LLM_MODEL; do
-  v="$(grep -E "^$k=" "$REPO/.env" | cut -d= -f2- | tr -d '"')"
+  v="$(grep -E "^$k=" "$REPO/.env" | cut -d= -f2- | tr -d '"' || true)"
   if [ -n "$v" ]; then export "$k=$v"; fi
 done
 
