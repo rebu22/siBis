@@ -2,9 +2,9 @@
 
 namespace Tests\Feature;
 
-use App\Models\Article;
 use App\Models\ChatMessage;
 use App\Models\ChatSession;
+use App\Models\Regulation;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
@@ -31,40 +31,41 @@ class CoreFlowTest extends TestCase
         return $user;
     }
 
-    private function article(string $status = 'published', string $title = 'Panduan Mendirikan PT'): Article
+    private function kebijakan(string $status = 'published', string $title = 'Panduan Mendirikan PT'): Regulation
     {
-        return Article::create([
+        return Regulation::create([
             'title' => $title,
             'slug' => Str::slug($title).'-'.Str::random(4),
             'category' => 'Badan Usaha',
             'excerpt' => 'Ringkasan singkat.',
-            'body' => 'Isi artikel.',
+            'file_path' => 'kebijakan/panduan.pdf',
+            'file_size' => 2048,
             'status' => $status,
             'published_at' => $status === 'published' ? now() : null,
         ]);
     }
 
-    public function test_pencarian_artikel_kebal_injeksi_sql_dan_tidak_membocorkan_draft(): void
+    public function test_pencarian_kebijakan_kebal_injeksi_sql_dan_tidak_membocorkan_draft(): void
     {
-        $this->article();
-        $this->article('draft', 'Draf Internal');
+        $this->kebijakan();
+        $this->kebijakan('draft', 'Draf Internal');
 
         // Muatan klasik: bila ada penggabungan string SQL, ini akan mengembalikan semua baris.
-        $this->get('/artikel?q='.urlencode("' OR 1=1 --"))
+        $this->get('/kebijakan?q='.urlencode("' OR 1=1 --"))
             ->assertOk()
             ->assertInertia(fn (AssertableInertia $page) => $page
-                ->component('Articles/Index')
-                ->has('articles.data', 0));
+                ->component('Kebijakan/Index')
+                ->has('regulations.data', 0));
 
-        $this->get('/artikel?q='.urlencode('%'))
+        $this->get('/kebijakan?q='.urlencode('%'))
             ->assertOk()
-            ->assertInertia(fn (AssertableInertia $page) => $page->has('articles.data', 1));
+            ->assertInertia(fn (AssertableInertia $page) => $page->has('regulations.data', 1));
 
-        $this->get('/artikel?q=Panduan')
+        $this->get('/kebijakan?q=Panduan')
             ->assertOk()
-            ->assertInertia(fn (AssertableInertia $page) => $page->has('articles.data', 1));
+            ->assertInertia(fn (AssertableInertia $page) => $page->has('regulations.data', 1));
 
-        $this->get('/artikel/'.Str::slug('Draf Internal'))->assertNotFound();
+        $this->get('/kebijakan/'.Str::slug('Draf Internal'))->assertNotFound();
     }
 
     public function test_riwayat_dan_penilaian_milik_orang_lain_tidak_bisa_diakses(): void

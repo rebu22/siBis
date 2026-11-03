@@ -61,6 +61,14 @@ defineProps({
                                         >[{{ index + 1 }}] {{ source.title }}</span
                                     >
                                     <span v-if="source.snippet"> — {{ source.snippet }}</span>
+                                    <a
+                                        v-if="source.url"
+                                        :href="source.url"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        class="link-quiet ml-1 text-caption"
+                                        >buka PDF</a
+                                    >
                                 </li>
                             </ol>
                         </div>

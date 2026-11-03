@@ -32,7 +32,7 @@ const user = computed(() => page.props.auth.user);
                         :class="route().current('history.*') ? 'nav-link-active' : 'nav-link'"
                         >Riwayat</Link
                     >
-                    <Link href="/artikel" class="nav-link">Artikel</Link>
+                    <Link href="/kebijakan" class="nav-link">Kebijakan</Link>
                     <Link
                         v-if="user?.role === 'admin'"
                         :href="route('admin.dashboard')"

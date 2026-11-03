@@ -55,6 +55,10 @@ Halaman konsultasi memanggil microservice Python di `service/` lewat `RAG_URL`
 (bawaan `http://127.0.0.1:8001`). Kalau layanan itu tidak dinyalakan, aplikasi tetap jalan
 dan menampilkan pesan fallback — tidak error.
 
+Model penjawabnya diatur lewat `LLM_BASE_URL`, `LLM_MODEL`, dan `LLM_API_KEY` di `.env`
+(endpoint kompatibel OpenAI). `start.sh` menyalakan aplikasi dan layanan AI sekaligus, aman
+dijalankan berulang, dan memakai `bash start.sh --restart` setelah `.env` diubah.
+
 ## Alur pemakaian pengguna
 
 1. **Beranda** `/` — profil perusahaan: visi, misi, layanan, kontak, dan artikel terbaru.

@@ -12,12 +12,11 @@ const LABELS = {
     chats: 'Percakapan',
     messages: 'Pesan',
     reports_open: 'Laporan baru',
-    articles: 'Artikel',
+    regulations: 'Kebijakan',
 };
 
 // Bagian yang UI-nya disiapkan tetapi backend-nya belum dibangun.
 const PENDING = [
-    'Unggah PDF regulasi ke basis pengetahuan',
     'Monitoring pembayaran premium',
     'Laporan bug dari pengguna',
     'Pesan pengguna ke admin',
@@ -82,14 +81,14 @@ const PENDING = [
                         </p>
                     </Link>
                     <Link
-                        :href="route('admin.articles')"
+                        :href="route('admin.regulations')"
                         class="group bg-white p-6 transition-colors duration-200 hover:bg-slate-50"
                     >
                         <p class="text-sub-sm font-semibold text-slate-900 group-hover:text-indigo-600">
-                            Artikel
+                            Kebijakan
                         </p>
                         <p class="mt-2 text-body-sm text-slate-500">
-                            Tulis, ubah, dan terbitkan artikel untuk halaman publik.
+                            Unggah PDF regulasi: tampil di halaman publik dan jadi rujukan chatbot.
                         </p>
                     </Link>
                 </div>

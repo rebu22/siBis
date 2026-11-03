@@ -3,22 +3,25 @@
 namespace App\Http\Controllers;
 
 use App\Models\AnswerReport;
-use App\Models\Article;
 use App\Models\ChatMessage;
 use App\Models\ChatSession;
 use App\Models\OtpCode;
+use App\Models\Regulation;
 use App\Models\User;
+use App\Services\RagClient;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
 
 /**
- * UC-03 + area admin: dasbor, gerbang OTP, monitoring pengguna, dan CRUD artikel.
- * Yang belum dibangun: unggah PDF ke basis pengetahuan, monitoring pembayaran, laporan bug.
+ * UC-03 + area admin: dasbor, gerbang OTP, monitoring pengguna, dan CRUD kebijakan (PDF).
+ * Yang belum dibangun: monitoring pembayaran premium dan laporan bug/pesan pengguna.
  */
 class AdminController extends Controller
 {
@@ -30,7 +33,7 @@ class AdminController extends Controller
                 'chats' => ChatSession::query()->count(),
                 'messages' => ChatMessage::query()->count(),
                 'reports_open' => AnswerReport::query()->where('status', 'baru')->count(),
-                'articles' => Article::query()->count(),
+                'regulations' => Regulation::query()->count(),
             ],
             'reports' => AnswerReport::query()->with('message:id,body')->latest('id')->take(10)->get(),
         ]);
@@ -134,81 +137,186 @@ class AdminController extends Controller
         ]);
     }
 
-    /** RF-14: daftar artikel untuk CMS. Isi penuh ikut dikirim karena form ubah memakainya. */
-    public function articles(): Response
+    /** RF-14: daftar kebijakan untuk CMS, dengan pencarian dan paginasi. */
+    public function regulations(Request $request): Response
     {
-        $articles = Article::query()
+        $filters = $request->only('q');
+
+        $regulations = Regulation::query()
+            ->search($filters['q'] ?? null)
             ->latest('id')
-            ->take(60)
-            ->get()
-            ->map(fn (Article $article) => [
-                'id' => $article->id,
-                'title' => $article->title,
-                'slug' => $article->slug,
-                'category' => $article->category,
-                'excerpt' => $article->excerpt,
-                'body' => $article->body,
-                'status' => $article->status,
-                'published_at' => $article->published_at?->toDateString(),
-                'updated_at' => $article->updated_at?->toDateTimeString(),
+            ->paginate(10)
+            ->withQueryString()
+            ->through(fn (Regulation $regulation) => [
+                'id' => $regulation->id,
+                'title' => $regulation->title,
+                'slug' => $regulation->slug,
+                'category' => $regulation->category,
+                'excerpt' => $regulation->excerpt,
+                'status' => $regulation->status,
+                'size_kb' => (int) round($regulation->file_size / 1024),
+                'indexed' => $regulation->rag_doc_id !== null,
+                'published_at' => $regulation->published_at?->toDateString(),
             ]);
 
-        return Inertia::render('Admin/Articles', ['articles' => $articles]);
+        return Inertia::render('Admin/Regulations', ['regulations' => $regulations, 'filters' => $filters]);
     }
 
-    public function storeArticle(Request $request): RedirectResponse
+    /** UC-18: PDF disimpan di disk publik (dibaca pengguna) sekaligus diindeks ke layanan RAG (dikutip chatbot). */
+    public function storeRegulation(Request $request, RagClient $rag): RedirectResponse
     {
-        $data = $this->validatedArticle($request);
-        $data['user_id'] = $request->user()->id;
-        $data['published_at'] = $data['status'] === 'published' ? now() : null;
+        $data = $this->validatedRegulation($request);
 
-        Article::create($data);
+        $regulation = Regulation::create($data + [
+            'user_id' => $request->user()->id,
+            'published_at' => $data['status'] === 'published' ? now() : null,
+        ]);
 
-        return back()->with('success', 'Artikel tersimpan.');
+        $sebab = $this->storePdf($regulation, $request, $rag);
+
+        return $sebab === null
+            ? back()->with('success', 'Kebijakan tersimpan dan PDF masuk basis pengetahuan.')
+            : back()->with('error', 'Kebijakan tersimpan, tetapi PDF belum masuk basis pengetahuan: '.$sebab.' Pakai tombol "Indeks ulang" untuk mencoba lagi.');
     }
 
-    public function updateArticle(Request $request, Article $article): RedirectResponse
+    public function updateRegulation(Request $request, Regulation $regulation, RagClient $rag): RedirectResponse
     {
-        $data = $this->validatedArticle($request, $article);
+        $data = $this->validatedRegulation($request, $regulation);
 
-        if ($data['status'] === 'published' && $article->published_at === null) {
+        if ($data['status'] === 'published' && $regulation->published_at === null) {
             $data['published_at'] = now();
         }
 
-        $article->update($data);
+        $regulation->update($data);
 
-        return back()->with('success', 'Perubahan artikel tersimpan.');
+        // Indeks lama dipertahankan kecuali admin mengunggah PDF baru.
+        if (! $request->hasFile('file')) {
+            return back()->with('success', 'Perubahan kebijakan tersimpan.');
+        }
+
+        $sebab = $this->storePdf($regulation, $request, $rag);
+
+        return $sebab === null
+            ? back()->with('success', 'Perubahan tersimpan dan PDF baru sudah diindeks.')
+            : back()->with('error', 'Perubahan tersimpan, tetapi PDF baru belum masuk basis pengetahuan: '.$sebab);
     }
 
-    public function destroyArticle(Article $article): RedirectResponse
+    /** Indeks ulang PDF yang sudah tersimpan (mis. saat unggah pertama layanan AI sedang mati). */
+    public function reindexRegulation(Regulation $regulation, RagClient $rag): RedirectResponse
     {
-        $article->delete();
+        if (! $regulation->file_path) {
+            return back()->with('error', 'Kebijakan ini belum punya PDF.');
+        }
 
-        return back()->with('success', 'Artikel dihapus.');
+        $path = Storage::disk('public')->path($regulation->file_path);
+
+        if (! is_file($path)) {
+            return back()->with('error', 'Berkas PDF-nya tidak ada di penyimpanan. Unggah ulang lewat tombol Ubah.');
+        }
+
+        // UploadedFile dibungkus dari berkas yang sudah ada supaya RagClient tidak perlu dua jalur unggah.
+        $file = new UploadedFile($path, basename($path), 'application/pdf', null, true);
+        $sebab = $this->index($regulation, $file, $rag);
+
+        return $sebab === null
+            ? back()->with('success', 'PDF diindeks ulang dan siap dikutip chatbot.')
+            : back()->with('error', 'Indeks ulang gagal: '.$sebab);
+    }
+
+    /** UC-25: hapus kebijakan sekaligus membuang potongannya dari basis pengetahuan. */
+    public function destroyRegulation(Regulation $regulation, RagClient $rag): RedirectResponse
+    {
+        if ($regulation->rag_doc_id) {
+            $rag->deleteDocument($regulation->rag_doc_id);
+        }
+
+        if ($regulation->file_path) {
+            Storage::disk('public')->delete($regulation->file_path);
+        }
+
+        $regulation->delete();
+
+        return back()->with('success', 'Kebijakan dihapus.');
+    }
+
+    /**
+     * Simpan PDF ke disk publik lalu indeks ke RAG. Kegagalan indeks tidak membatalkan berkasnya:
+     * halaman publik tetap punya PDF, admin cuma diberi tahu bahwa chatbot belum bisa mengutipnya.
+     *
+     * @return string|null null kalau PDF masuk basis pengetahuan, selain itu alasan asli dari layanan
+     */
+    private function storePdf(Regulation $regulation, Request $request, RagClient $rag): ?string
+    {
+        $file = $request->file('file');
+
+        if ($file === null) {
+            return null;
+        }
+
+        if ($regulation->file_path) {
+            Storage::disk('public')->delete($regulation->file_path);
+        }
+
+        $path = $file->storeAs('kebijakan', $regulation->slug.'.pdf', 'public');
+        $regulation->update(['file_path' => $path, 'file_size' => (int) $file->getSize()]);
+
+        return $this->index($regulation, $file, $rag);
+    }
+
+    /** @return string|null null kalau berhasil, selain itu alasan gagal (PDF pindai, layanan mati, ...) */
+    private function index(Regulation $regulation, UploadedFile $file, RagClient $rag): ?string
+    {
+        $lama = $regulation->rag_doc_id;
+
+        try {
+            $document = $rag->ingestPdf($file, $regulation->title, route('regulations.show', $regulation->slug));
+        } catch (\RuntimeException $e) {
+            $regulation->update(['rag_doc_id' => null]);
+
+            return $e->getMessage();
+        }
+
+        // Dokumen lama (kalau ada) dibuang setelah yang baru masuk, supaya tidak ada dua salinan.
+        if ($lama) {
+            $rag->deleteDocument($lama);
+        }
+
+        $regulation->update(['rag_doc_id' => $document['id']]);
+
+        return null;
     }
 
     /**
      * Slug dibuat unik di sini, bukan lewat aturan unique, karena slug boleh dikosongkan
      * dan diambil dari judul. Hasilnya: "judul-sama", "judul-sama-2", dst.
      */
-    private function validatedArticle(Request $request, ?Article $article = null): array
+    private function validatedRegulation(Request $request, ?Regulation $regulation = null): array
     {
         $data = $request->validate([
             'title' => ['required', 'string', 'max:160'],
             'slug' => ['nullable', 'string', 'max:160', 'alpha_dash'],
             'category' => ['nullable', 'string', 'max:60'],
             'excerpt' => ['nullable', 'string', 'max:300'],
-            'body' => ['required', 'string', 'min:40', 'max:20000'],
+            'file' => [$regulation?->file_path ? 'nullable' : 'required', 'file', 'mimes:pdf', 'max:20480'],
             'status' => ['required', 'in:draft,published'],
         ]);
 
+        unset($data['file']);
+
+        // Kategori diketik bebas: "perizinan" dan "Perizinan" akan tampil sebagai dua filter terpisah.
+        if (array_key_exists('category', $data)) {
+            $data['category'] = filled($data['category'])
+                ? Str::ucfirst(Str::lower(trim($data['category'])))
+                : null;
+        }
+
         $base = ($data['slug'] ?? null) ?: Str::slug($data['title']);
-        $base = $base !== '' ? $base : 'artikel';
+        $base = $base !== '' ? $base : 'kebijakan';
         $slug = $base;
         $suffix = 2;
 
-        while (Article::query()
-            ->when($article !== null, fn ($query) => $query->whereKeyNot($article->id))
+        while (Regulation::query()
+            ->when($regulation !== null, fn ($query) => $query->whereKeyNot($regulation->id))
             ->where('slug', $slug)
             ->exists()) {
             $slug = $base.'-'.$suffix++;

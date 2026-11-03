@@ -45,7 +45,8 @@ class ConsultationController extends Controller
 
         $session = $user->chatSessions()->latest('id')->first() ?? $user->chatSessions()->create([]);
 
-        $history = $session->messages()->latest('id')->take(self::HISTORY_TURNS)->get()->reverse()->values();
+        // ponytail: jawaban gagal tidak boleh masuk konteks, model kecil menirunya sebagai jawaban sendiri.
+        $history = $session->messages()->where('degraded', false)->latest('id')->take(self::HISTORY_TURNS)->get()->reverse()->values();
 
         $session->messages()->create(['role' => 'user', 'body' => $data['question']]);
 

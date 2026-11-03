@@ -1,16 +1,16 @@
 <?php
 
 use App\Http\Controllers\AdminController;
-use App\Http\Controllers\ArticleController;
 use App\Http\Controllers\ConsultationController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\RegulationController;
 use Illuminate\Support\Facades\Route;
 
 // --- Publik (RF-01..RF-04) ---
 Route::get('/', [HomeController::class, 'index'])->name('home');
-Route::get('/artikel', [ArticleController::class, 'index'])->name('articles.index');
-Route::get('/artikel/{article}', [ArticleController::class, 'show'])->name('articles.show');
+Route::get('/kebijakan', [RegulationController::class, 'index'])->name('regulations.index');
+Route::get('/kebijakan/{regulation}', [RegulationController::class, 'show'])->name('regulations.show');
 
 // --- Konsultasi AI (RF-05..RF-13, RF-25, RF-26) ---
 Route::middleware(['auth', 'verified'])->group(function () {
@@ -34,10 +34,11 @@ Route::middleware(['auth', 'verified', 'admin'])->prefix('admin')->group(functio
     Route::get('/', [AdminController::class, 'dashboard'])->name('admin.dashboard');
     Route::get('/pengguna', [AdminController::class, 'users'])->name('admin.users');
 
-    Route::get('/artikel', [AdminController::class, 'articles'])->name('admin.articles');
-    Route::post('/artikel', [AdminController::class, 'storeArticle'])->name('admin.articles.store');
-    Route::patch('/artikel/{article}', [AdminController::class, 'updateArticle'])->name('admin.articles.update');
-    Route::delete('/artikel/{article}', [AdminController::class, 'destroyArticle'])->name('admin.articles.destroy');
+    Route::get('/kebijakan', [AdminController::class, 'regulations'])->name('admin.regulations');
+    Route::post('/kebijakan', [AdminController::class, 'storeRegulation'])->name('admin.regulations.store');
+    Route::post('/kebijakan/{regulation}/indeks', [AdminController::class, 'reindexRegulation'])->name('admin.regulations.reindex');
+    Route::patch('/kebijakan/{regulation}', [AdminController::class, 'updateRegulation'])->name('admin.regulations.update');
+    Route::delete('/kebijakan/{regulation}', [AdminController::class, 'destroyRegulation'])->name('admin.regulations.destroy');
     Route::get('/verifikasi', [AdminController::class, 'showTwoFactor'])->name('admin.2fa');
     Route::post('/verifikasi/kirim', [AdminController::class, 'sendOtp'])->middleware('throttle:6,1')->name('admin.2fa.send');
     Route::post('/verifikasi', [AdminController::class, 'verifyOtp'])->name('admin.2fa.verify');

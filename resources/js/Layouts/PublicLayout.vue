@@ -33,7 +33,7 @@ const company = computed(() => page.props.company);
                 </Link>
 
                 <nav class="flex items-center gap-6">
-                    <Link href="/artikel" class="nav-link">Artikel</Link>
+                    <Link href="/kebijakan" class="nav-link">Kebijakan</Link>
                     <Link href="/#layanan" class="nav-link">Layanan</Link>
                     <Link href="/#biaya" class="nav-link">Biaya</Link>
                 </nav>
@@ -124,9 +124,9 @@ const company = computed(() => page.props.company);
                     <ul class="mt-4 space-y-3">
                         <li>
                             <Link
-                                href="/artikel"
+                                href="/kebijakan"
                                 class="text-body-sm text-slate-500 transition-colors duration-200 hover:text-indigo-600"
-                                >Artikel</Link
+                                >Kebijakan</Link
                             >
                         </li>
                         <li>

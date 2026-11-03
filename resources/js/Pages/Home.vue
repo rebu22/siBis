@@ -4,7 +4,7 @@ import { Head, Link, usePage } from '@inertiajs/vue3';
 import { computed } from 'vue';
 
 defineProps({
-    articles: { type: Array, default: () => [] },
+    regulations: { type: Array, default: () => [] },
 });
 
 const company = computed(() => usePage().props.company);
@@ -61,8 +61,8 @@ const ctaHref = computed(() =>
                                 <path d="M5 12h14m-6-6 6 6-6 6" />
                             </svg>
                         </Link>
-                        <Link :href="route('articles.index')" class="btn-ghost">
-                            Lihat artikel
+                        <Link :href="route('regulations.index')" class="btn-ghost">
+                            Lihat kebijakan
                         </Link>
                     </div>
 
@@ -292,7 +292,7 @@ const ctaHref = computed(() =>
                                     class="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-indigo-600"
                                     aria-hidden="true"
                                 />
-                                Seluruh artikel edukasi
+                                Seluruh kebijakan & regulasi
                             </li>
                         </ul>
                         <Link :href="ctaHref" class="btn-primary mt-8 w-full">
@@ -342,29 +342,29 @@ const ctaHref = computed(() =>
             </div>
         </section>
 
-        <!-- Artikel terbaru -->
+        <!-- Kebijakan terbaru -->
         <section class="bg-slate-50">
             <div class="mx-auto max-w-7xl px-4 pb-16 sm:px-6 sm:pb-20 lg:pb-24">
                 <div class="flex flex-wrap items-baseline justify-between gap-4">
                     <div>
-                        <p class="eyebrow">Artikel terbaru</p>
+                        <p class="eyebrow">Kebijakan terbaru</p>
                         <h2 class="mt-4 text-h-sm font-bold sm:text-h-md">
-                            Bacaan singkat sebelum bertanya
+                            Rujukan resmi untuk pertanyaanmu
                         </h2>
                     </div>
-                    <Link :href="route('articles.index')" class="link-quiet">
-                        Semua artikel
+                    <Link :href="route('regulations.index')" class="link-quiet">
+                        Semua kebijakan
                         <span aria-hidden="true">→</span>
                     </Link>
                 </div>
 
-                <p v-if="!articles.length" class="mt-8 text-body-sm text-slate-500">
-                    Belum ada artikel yang dipublikasikan.
+                <p v-if="!regulations.length" class="mt-8 text-body-sm text-slate-500">
+                    Belum ada kebijakan yang dipublikasikan.
                 </p>
 
                 <div class="mt-12 grid gap-8 sm:grid-cols-3">
                     <article
-                        v-for="article in articles"
+                        v-for="article in regulations"
                         :key="article.slug"
                         class="card flex flex-col p-6"
                     >
@@ -373,7 +373,7 @@ const ctaHref = computed(() =>
                         </p>
                         <h3 class="mt-4 text-sub-sm font-semibold text-slate-900">
                             <Link
-                                :href="route('articles.show', article.slug)"
+                                :href="route('regulations.show', article.slug)"
                                 class="transition-colors duration-200 hover:text-indigo-600"
                                 >{{ article.title }}</Link
                             >

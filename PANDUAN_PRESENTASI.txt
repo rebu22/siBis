@@ -127,7 +127,7 @@ Satu pertanyaan menempuh empat lapisan:
   FastAPI (Python)  -- ambil potongan peraturan yang relevan, susun prompt
        |  panggil endpoint kompatibel OpenAI
        v
-  Model bahasa lokal (Ollama, qwen2.5:3b)
+  Model daring (Google Gemini lewat AI Studio)
 
 Kenapa dipisah jadi dua aplikasi, bukan satu:
 
@@ -183,15 +183,17 @@ sudah diperiksa dapat diakses):
   - UU 6/2023 tentang Cipta Kerja
   - PP 5/2021 tentang Penyelenggaraan Perizinan Berusaha (NIB/OSS)
   
-Modelnya apa: qwen2.5:3b, model terbuka berukuran 3 miliar parameter,
-berjalan di komputer sendiri lewat Ollama. Tidak ada API key, tidak ada
-tagihan, dan data pertanyaan tidak keluar dari mesin.
+Modelnya apa: gemini-flash-lite-latest, model Google Gemini yang dipanggil
+lewat endpoint kompatibel OpenAI dari Google AI Studio. Jawaban dihasilkan
+di server Google, bukan di komputer sendiri. Pilihan ini diambil setelah
+mengukur: model lokal 3 miliar parameter butuh 12 detik atau lebih per
+jawaban karena berjalan di CPU, sedangkan Gemini 2-6 detik.
 
 Pengaturan yang relevan:
   - suhu 0,2 (rendah, supaya jawaban tidak melebar dan konsisten)
   - empat sumber teratas yang diambil
-  - batas waktu 30 detik di sisi Laravel
-  - jawaban nyata terukur sekitar 12 detik
+  - batas waktu 60 detik di sisi Laravel
+  - jawaban nyata terukur 2-6 detik
 
 Tiga pengaman yang bisa kamu sebut sebagai bentuk tanggung jawab:
   1. Jawaban dibatasi pada konteks. Bukan model yang bebas mengarang.
@@ -211,7 +213,7 @@ didapat kalau model hanya dilatih ulang.
 ---------------------------
   - 36 test, 207 pemeriksaan, semuanya lulus
   - 6 dokumen peraturan di basis pengetahuan
-  - jawaban pertama terukur 11,7 detik, 4 sumber dikutip
+  - jawaban terukur 2-6 detik, 4 sumber dikutip
   - basis vektor berukuran sekitar 804 KB
   - kuota 5 pertanyaan per hari untuk paket gratis, 100 untuk premium
   - kode OTP admin berlaku 5 menit, maksimal 5 percobaan, sesi admin
@@ -248,13 +250,16 @@ tahu. Ini justru poin kuat, bukan kelemahan.
 
 10. KEMUNGKINAN PERTANYAAN PENGUJI
 ---------------------------------
-T: Kenapa tidak memakai ChatGPT atau API berbayar saja?
-J: Tiga alasan. Biaya per pertanyaan tidak cocok untuk paket gratis, data
-   pengguna akan keluar ke pihak ketiga, dan untuk data bisnis yang
-   sesekali sensitif itu tidak dapat diterima. Model lokal membuat data
-   tidak keluar dari mesin. Karena antarmuka modelnya mengikuti standar
-   OpenAI, mengganti penyedia nanti hanya soal mengubah tiga variabel
-   konfigurasi, tanpa mengubah kode.
+T: Kenapa memakai API Gemini, bukan model yang berjalan sendiri?
+J: Awalnya proyek ini memakai model lokal supaya data tidak keluar dari
+   mesin. Model lokal itu berfungsi, tetapi butuh 12 detik atau lebih per
+   jawaban karena hanya CPU, dan satu permintaan harus menunggu yang lain.
+   Waktu tunggu sepanjang itu terlalu lama untuk dipakai. Setelah diukur,
+   Gemini memberi jawaban 2-6 detik. Konsekuensinya disadari dan bisa
+   disebutkan: pertanyaan pengguna terkirim ke Google. Karena antarmuka
+   model mengikuti standar OpenAI, perpindahan penyedia hanya mengubah tiga
+   variabel di .env tanpa mengubah kode, dan model lokal bisa dihidupkan
+   lagi kapan saja kalau prioritasnya privasi.
 
 T: Bagaimana mencegah AI mengarang jawaban?
 J: Model tidak diberi kebebasan menjawab dari ingatannya. Ia hanya menerima
@@ -306,10 +311,13 @@ J: Model 3 miliar parameter cukup untuk jawaban ringkas, tetapi bukan yang
      sendiri.
   b. Pengiriman email verifikasi belum berfungsi penuh karena kredensial
      SMTP belum benar, sehingga kode verifikasi masih terbaca dari log.
-  c. Model qwen2.5:3b berlisensi riset, aman untuk tugas akademik, tetapi
-     untuk layanan berbayar sebaiknya diganti versi berlisensi Apache.
-  d. Tiga proses (aplikasi, layanan AI, model) masih dinyalakan manual dan
-     belum punya penjalan otomatis.
+  c. Pertanyaan pengguna dan potongan peraturan yang dirujuk dikirim ke
+     server Google. Pada paket gratis, Google menyatakan input dapat dipakai
+     untuk memperbaiki produk dan dibaca reviewer manusia. Untuk tugas
+     akademik dengan data contoh ini wajar; untuk data usaha sungguhan
+     perlu dipertimbangkan ulang.
+  d. Dua proses (aplikasi dan layanan AI) dinyalakan oleh skrip start.sh,
+     dan skrip itu dipanggil otomatis saat login lewat autostart GNOME.
 
 Mengakui empat hal ini dengan tenang akan lebih dihargai daripada berpura-
 pura semuanya selesai.
