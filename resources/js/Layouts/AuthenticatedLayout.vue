@@ -34,6 +34,11 @@ const user = computed(() => page.props.auth.user);
                     >
                     <Link href="/kebijakan" class="nav-link">Kebijakan</Link>
                     <Link
+                        :href="route('contact.create')"
+                        :class="route().current('contact.*') ? 'nav-link-active' : 'nav-link'"
+                        >Bantuan</Link
+                    >
+                    <Link
                         v-if="user?.role === 'admin'"
                         :href="route('admin.dashboard')"
                         :class="route().current('admin.*') ? 'nav-link-active' : 'nav-link'"

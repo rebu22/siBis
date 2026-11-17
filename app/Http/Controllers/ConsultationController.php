@@ -98,6 +98,22 @@ class ConsultationController extends Controller
         ]);
     }
 
+    /** RF-24 / UC-09: hapus satu percakapan milik sendiri (pesan ikut terhapus lewat cascade). */
+    public function destroy(Request $request, int $session): RedirectResponse
+    {
+        $request->user()->chatSessions()->findOrFail($session)->delete();
+
+        return redirect()->route('history.index')->with('success', 'Percakapan dihapus dari riwayat.');
+    }
+
+    /** RF-24 / UC-09: hapus seluruh riwayat konsultasi milik user yang sedang login. */
+    public function destroyAll(Request $request): RedirectResponse
+    {
+        $request->user()->chatSessions()->delete();
+
+        return redirect()->route('history.index')->with('success', 'Seluruh riwayat konsultasi dihapus.');
+    }
+
     /** UC-10 / RF-25: satu nilai per jawaban; menilai ulang akan menimpa. */
     public function rate(Request $request, int $message): RedirectResponse
     {

@@ -143,6 +143,20 @@ const company = computed(() => page.props.company);
                                 >Daftar</Link
                             >
                         </li>
+                        <li>
+                            <Link
+                                :href="route('bug.create')"
+                                class="text-body-sm text-slate-500 transition-colors duration-200 hover:text-indigo-600"
+                                >Lapor bug</Link
+                            >
+                        </li>
+                        <li v-if="user">
+                            <Link
+                                :href="route('contact.create')"
+                                class="text-body-sm text-slate-500 transition-colors duration-200 hover:text-indigo-600"
+                                >Hubungi admin</Link
+                            >
+                        </li>
                     </ul>
                 </div>
 

@@ -1,8 +1,23 @@
 <script setup>
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
-import { Head, Link } from '@inertiajs/vue3';
+import { Head, Link, router } from '@inertiajs/vue3';
 
 defineProps({ sessions: { type: Object, required: true } });
+
+function hapus(session) {
+    const judul = session.title ?? 'percakapan tanpa judul';
+    if (!confirm(`Hapus "${judul}"? Pesan di dalamnya ikut terhapus dan tidak bisa dikembalikan.`)) {
+        return;
+    }
+
+    router.delete(route('history.destroy', session.id), { preserveScroll: true });
+}
+
+function hapusSemua() {
+    if (!confirm('Hapus seluruh riwayat konsultasi? Tindakan ini tidak bisa dibatalkan.')) return;
+
+    router.delete(route('history.destroyAll'), { preserveScroll: true });
+}
 </script>
 
 <template>
@@ -21,11 +36,23 @@ defineProps({ sessions: { type: Object, required: true } });
         </template>
 
         <div class="mx-auto max-w-[880px] px-6 py-10">
+            <div
+                v-if="sessions.data.length"
+                class="flex flex-wrap items-center justify-between gap-3"
+            >
+                <p class="text-body-sm text-slate-500">
+                    {{ sessions.total }} percakapan tersimpan.
+                </p>
+                <button type="button" class="btn-quiet btn-sm" @click="hapusSemua">
+                    Hapus semua riwayat
+                </button>
+            </div>
+
             <p v-if="!sessions.data.length" class="text-body-sm text-slate-500">
                 Belum ada percakapan tersimpan.
             </p>
 
-            <ul v-else class="space-y-4">
+            <ul v-else class="mt-4 space-y-4">
                 <li
                     v-for="session in sessions.data"
                     :key="session.id"
@@ -42,11 +69,20 @@ defineProps({ sessions: { type: Object, required: true } });
                             {{ session.messages_count }} pesan · {{ session.updated_at }}
                         </p>
                     </div>
-                    <Link
-                        :href="route('history.show', session.id)"
-                        class="btn-ghost btn-sm min-h-[44px]"
-                        >Buka</Link
-                    >
+                    <div class="flex items-center gap-3">
+                        <Link
+                            :href="route('history.show', session.id)"
+                            class="btn-ghost btn-sm min-h-[44px]"
+                            >Buka</Link
+                        >
+                        <button
+                            type="button"
+                            class="btn-quiet btn-sm min-h-[44px]"
+                            @click="hapus(session)"
+                        >
+                            Hapus
+                        </button>
+                    </div>
                 </li>
             </ul>
 

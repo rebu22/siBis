@@ -1,11 +1,19 @@
 <script setup>
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
-import { Head } from '@inertiajs/vue3';
+import { Head, router } from '@inertiajs/vue3';
 
-defineProps({
+const props = defineProps({
     session: { type: Object, required: true },
     messages: { type: Array, default: () => [] },
 });
+
+function hapus() {
+    if (!confirm('Hapus percakapan ini beserta seluruh pesannya? Tindakan ini tidak bisa dibatalkan.')) {
+        return;
+    }
+
+    router.delete(route('history.destroy', props.session.id));
+}
 </script>
 
 <template>
@@ -13,11 +21,20 @@ defineProps({
         <Head :title="session.title ?? 'Riwayat konsultasi'" />
 
         <template #header>
-            <p class="eyebrow">Riwayat · hanya baca</p>
-            <h1 class="mt-3 text-h-sm font-bold text-slate-900">
-                {{ session.title ?? 'Percakapan tanpa judul' }}
-            </h1>
-            <p class="mt-2 text-caption text-slate-500">Mulai {{ session.created_at }}</p>
+            <div class="flex flex-wrap items-start justify-between gap-4">
+                <div>
+                    <p class="eyebrow">Riwayat · hanya baca</p>
+                    <h1 class="mt-3 text-h-sm font-bold text-slate-900">
+                        {{ session.title ?? 'Percakapan tanpa judul' }}
+                    </h1>
+                    <p class="mt-2 text-caption text-slate-500">
+                        Mulai {{ session.created_at }}
+                    </p>
+                </div>
+                <button type="button" class="btn-quiet btn-sm" @click="hapus">
+                    Hapus percakapan
+                </button>
+            </div>
         </template>
 
         <div class="mx-auto max-w-[880px] px-6 py-10">

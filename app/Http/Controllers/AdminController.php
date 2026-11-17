@@ -3,8 +3,12 @@
 namespace App\Http\Controllers;
 
 use App\Models\AnswerReport;
+use App\Models\AuditLog;
+use App\Models\BugReport;
 use App\Models\ChatMessage;
 use App\Models\ChatSession;
+use App\Models\CompanyProfile;
+use App\Models\ContactMessage;
 use App\Models\OtpCode;
 use App\Models\Regulation;
 use App\Models\User;
@@ -20,8 +24,9 @@ use Inertia\Inertia;
 use Inertia\Response;
 
 /**
- * UC-03 + area admin: dasbor, gerbang OTP, monitoring pengguna, dan CRUD kebijakan (PDF).
- * Yang belum dibangun: monitoring pembayaran premium dan laporan bug/pesan pengguna.
+ * UC-03 + area admin: dasbor, gerbang OTP, monitoring pengguna, CRM konten,
+ * tindak lanjut laporan jawaban, dan audit log.
+ * Yang belum dibangun: monitoring pembayaran premium.
  */
 class AdminController extends Controller
 {
@@ -34,6 +39,8 @@ class AdminController extends Controller
                 'messages' => ChatMessage::query()->count(),
                 'reports_open' => AnswerReport::query()->where('status', 'baru')->count(),
                 'regulations' => Regulation::query()->count(),
+                'bugs_open' => BugReport::query()->where('status', 'baru')->count(),
+                'messages_unread' => ContactMessage::query()->whereNull('read_at')->count(),
             ],
             'reports' => AnswerReport::query()->with('message:id,body')->latest('id')->take(10)->get(),
         ]);
@@ -137,6 +144,215 @@ class AdminController extends Controller
         ]);
     }
 
+    /** RF-17 / UC-18: admin mengubah konten profil tanpa menyentuh kode. */
+    public function editProfile(): Response
+    {
+        return Inertia::render('Admin/Profile', [
+            'profile' => CompanyProfile::current(),
+        ]);
+    }
+
+    public function updateProfile(Request $request): RedirectResponse
+    {
+        $data = $request->validate([
+            'name' => ['required', 'string', 'max:120'],
+            'vision' => ['nullable', 'string', 'max:1000'],
+            'mission' => ['nullable', 'string', 'max:2000'],
+            'services' => ['nullable', 'string', 'max:2000'],
+            'contact_email' => ['nullable', 'email', 'max:160'],
+            'contact_phone' => ['nullable', 'string', 'max:40'],
+            'address' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        $profile = CompanyProfile::current() ?? new CompanyProfile;
+        $profile->fill($data)->save();
+
+        AuditLog::record('company_profile.update', $profile, ['fields' => array_keys($data)]);
+
+        return back()->with('success', 'Profil perusahaan diperbarui dan langsung tampil di halaman publik.');
+    }
+
+    /** RF-26 / UC-11: admin meninjau laporan jawaban AI dan mengubah statusnya. */
+    public function reports(Request $request): Response
+    {
+        $status = (string) $request->query('status', '');
+        $status = in_array($status, AnswerReport::STATUSES, true) ? $status : '';
+
+        $reports = AnswerReport::query()
+            ->with(['message:id,chat_session_id,body', 'user:id,name,email'])
+            ->when($status !== '', fn ($query) => $query->where('status', $status))
+            ->latest('id')
+            ->paginate(20)
+            ->withQueryString()
+            ->through(fn (AnswerReport $report) => [
+                'id' => $report->id,
+                'reason' => $report->reason,
+                'note' => $report->note,
+                'status' => $report->status,
+                'created_at' => $report->created_at?->toDateTimeString(),
+                'message' => $report->message?->body,
+                'reporter' => $report->user ? [
+                    'name' => $report->user->name,
+                    'email' => $report->user->email,
+                ] : null,
+            ]);
+
+        $summary = [];
+
+        foreach (AnswerReport::STATUSES as $value) {
+            $summary[$value] = AnswerReport::query()->where('status', $value)->count();
+        }
+
+        return Inertia::render('Admin/Reports', [
+            'reports' => $reports,
+            'filters' => ['status' => $status],
+            'statuses' => AnswerReport::STATUSES,
+            'summary' => $summary,
+        ]);
+    }
+
+    public function updateReport(Request $request, AnswerReport $report): RedirectResponse
+    {
+        $data = $request->validate([
+            'status' => ['required', 'in:'.implode(',', AnswerReport::STATUSES)],
+            'note' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        $report->update($data);
+
+        AuditLog::record('answer_report.update', $report, ['status' => $data['status']]);
+
+        return back()->with('success', 'Laporan jawaban diperbarui.');
+    }
+
+    /** NFR-21: jejak audit perubahan konten, hanya menampilkan metadata (tanpa isi sensitif). */
+    public function audit(Request $request): Response
+    {
+        $action = trim((string) $request->query('action', ''));
+
+        $logs = AuditLog::query()
+            ->with('actor:id,name')
+            ->when($action !== '', fn ($query) => $query->where('action', 'like', "%{$action}%"))
+            ->latest('id')
+            ->paginate(30)
+            ->withQueryString()
+            ->through(fn (AuditLog $log) => [
+                'id' => $log->id,
+                'action' => $log->action,
+                'actor' => $log->actor?->name,
+                'subject' => $log->subject_type
+                    ? class_basename($log->subject_type).' #'.$log->subject_id
+                    : null,
+                'meta' => $log->meta,
+                'created_at' => $log->created_at?->toDateTimeString(),
+            ]);
+
+        return Inertia::render('Admin/Audit', [
+            'logs' => $logs,
+            'filters' => ['action' => $action],
+        ]);
+    }
+
+    /** RF-19 / UC-23: daftar laporan bug, bisa disaring status dan diberi catatan. */
+    public function bugReports(Request $request): Response
+    {
+        $status = (string) $request->query('status', '');
+        $status = in_array($status, BugReport::STATUSES, true) ? $status : '';
+
+        $reports = BugReport::query()
+            ->with('user:id,name')
+            ->when($status !== '', fn ($query) => $query->where('status', $status))
+            ->latest('id')
+            ->paginate(20)
+            ->withQueryString()
+            ->through(fn (BugReport $report) => [
+                'id' => $report->id,
+                'name' => $report->name ?? $report->user?->name,
+                'email' => $report->email,
+                'description' => $report->description,
+                'screenshot_url' => $report->screenshotUrl(),
+                'status' => $report->status,
+                'admin_note' => $report->admin_note,
+                'created_at' => $report->created_at?->toDateTimeString(),
+            ]);
+
+        $summary = [];
+
+        foreach (BugReport::STATUSES as $value) {
+            $summary[$value] = BugReport::query()->where('status', $value)->count();
+        }
+
+        return Inertia::render('Admin/BugReports', [
+            'reports' => $reports,
+            'filters' => ['status' => $status],
+            'statuses' => BugReport::STATUSES,
+            'summary' => $summary,
+        ]);
+    }
+
+    public function updateBugReport(Request $request, BugReport $bugReport): RedirectResponse
+    {
+        $data = $request->validate([
+            'status' => ['required', 'in:'.implode(',', BugReport::STATUSES)],
+            'admin_note' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        $bugReport->update($data);
+
+        AuditLog::record('bug_report.update', $bugReport, ['status' => $data['status']]);
+
+        return back()->with('success', 'Laporan bug diperbarui.');
+    }
+
+    /** RF-20 / UC-24: kotak masuk pesan pengguna, bisa ditandai dibaca/belum. */
+    public function messages(Request $request): Response
+    {
+        $filter = (string) $request->query('filter', '');
+        $filter = in_array($filter, ['unread', 'read'], true) ? $filter : '';
+
+        $messages = ContactMessage::query()
+            ->with('user:id,name,email')
+            ->when($filter === 'unread', fn ($query) => $query->whereNull('read_at'))
+            ->when($filter === 'read', fn ($query) => $query->whereNotNull('read_at'))
+            ->latest('id')
+            ->paginate(20)
+            ->withQueryString()
+            ->through(fn (ContactMessage $message) => [
+                'id' => $message->id,
+                'subject' => $message->subject,
+                'body' => $message->body,
+                'read_at' => $message->read_at?->toDateTimeString(),
+                'created_at' => $message->created_at?->toDateTimeString(),
+                'sender' => $message->user ? [
+                    'name' => $message->user->name,
+                    'email' => $message->user->email,
+                ] : null,
+            ]);
+
+        return Inertia::render('Admin/Messages', [
+            'messages' => $messages,
+            'filters' => ['filter' => $filter],
+            'summary' => [
+                'unread' => ContactMessage::query()->whereNull('read_at')->count(),
+                'total' => ContactMessage::query()->count(),
+            ],
+        ]);
+    }
+
+    public function updateMessage(Request $request, ContactMessage $message): RedirectResponse
+    {
+        $data = $request->validate(['read' => ['required', 'boolean']]);
+
+        $message->update([
+            'read_at' => $data['read'] ? ($message->read_at ?? now()) : null,
+        ]);
+
+        return back()->with(
+            'success',
+            $data['read'] ? 'Pesan ditandai sudah dibaca.' : 'Pesan ditandai belum dibaca.',
+        );
+    }
+
     /** RF-14: daftar kebijakan untuk CMS, dengan pencarian dan paginasi. */
     public function regulations(Request $request): Response
     {
@@ -172,6 +388,8 @@ class AdminController extends Controller
             'published_at' => $data['status'] === 'published' ? now() : null,
         ]);
 
+        AuditLog::record('regulation.create', $regulation, ['status' => $regulation->status]);
+
         $sebab = $this->storePdf($regulation, $request, $rag);
 
         return $sebab === null
@@ -188,6 +406,8 @@ class AdminController extends Controller
         }
 
         $regulation->update($data);
+
+        AuditLog::record('regulation.update', $regulation, ['status' => $regulation->status]);
 
         // Indeks lama dipertahankan kecuali admin mengunggah PDF baru.
         if (! $request->hasFile('file')) {
@@ -218,14 +438,20 @@ class AdminController extends Controller
         $file = new UploadedFile($path, basename($path), 'application/pdf', null, true);
         $sebab = $this->index($regulation, $file, $rag);
 
-        return $sebab === null
-            ? back()->with('success', 'PDF diindeks ulang dan siap dikutip chatbot.')
-            : back()->with('error', 'Indeks ulang gagal: '.$sebab);
+        if ($sebab === null) {
+            AuditLog::record('regulation.reindex', $regulation);
+
+            return back()->with('success', 'PDF diindeks ulang dan siap dikutip chatbot.');
+        }
+
+        return back()->with('error', 'Indeks ulang gagal: '.$sebab);
     }
 
     /** UC-25: hapus kebijakan sekaligus membuang potongannya dari basis pengetahuan. */
     public function destroyRegulation(Regulation $regulation, RagClient $rag): RedirectResponse
     {
+        AuditLog::record('regulation.delete', $regulation, ['title' => $regulation->title]);
+
         if ($regulation->rag_doc_id) {
             $rag->deleteDocument($regulation->rag_doc_id);
         }

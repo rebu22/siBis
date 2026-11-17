@@ -10,17 +10,15 @@ defineProps({
 const LABELS = {
     users: 'Pengguna',
     chats: 'Percakapan',
-    messages: 'Pesan',
-    reports_open: 'Laporan baru',
+    messages: 'Pesan chat',
+    reports_open: 'Laporan jawaban',
     regulations: 'Kebijakan',
+    bugs_open: 'Bug baru',
+    messages_unread: 'Pesan belum dibaca',
 };
 
 // Bagian yang UI-nya disiapkan tetapi backend-nya belum dibangun.
-const PENDING = [
-    'Monitoring pembayaran premium',
-    'Laporan bug dari pengguna',
-    'Pesan pengguna ke admin',
-];
+const PENDING = ['Monitoring pembayaran premium'];
 </script>
 
 <template>
@@ -36,7 +34,7 @@ const PENDING = [
         </template>
 
         <div class="mx-auto max-w-[1040px] px-6 py-10">
-            <dl class="grid gap-4 sm:grid-cols-3 lg:grid-cols-5">
+            <dl class="grid gap-4 sm:grid-cols-3 lg:grid-cols-4">
                 <div
                     v-for="(value, key) in stats"
                     :key="key"
@@ -91,11 +89,72 @@ const PENDING = [
                             Unggah PDF regulasi: tampil di halaman publik dan jadi rujukan chatbot.
                         </p>
                     </Link>
+                    <Link
+                        :href="route('admin.profile.edit')"
+                        class="group bg-white p-6 transition-colors duration-200 hover:bg-slate-50"
+                    >
+                        <p class="text-sub-sm font-semibold text-slate-900 group-hover:text-indigo-600">
+                            Profil perusahaan
+                        </p>
+                        <p class="mt-2 text-body-sm text-slate-500">
+                            Visi, misi, layanan, dan kontak yang tampil di halaman publik.
+                        </p>
+                    </Link>
+                    <Link
+                        :href="route('admin.reports')"
+                        class="group bg-white p-6 transition-colors duration-200 hover:bg-slate-50"
+                    >
+                        <p class="text-sub-sm font-semibold text-slate-900 group-hover:text-indigo-600">
+                            Laporan jawaban
+                        </p>
+                        <p class="mt-2 text-body-sm text-slate-500">
+                            Tinjau jawaban yang ditandai tidak akurat dan ubah statusnya.
+                        </p>
+                    </Link>
+                    <Link
+                        :href="route('admin.bugs')"
+                        class="group bg-white p-6 transition-colors duration-200 hover:bg-slate-50"
+                    >
+                        <p class="text-sub-sm font-semibold text-slate-900 group-hover:text-indigo-600">
+                            Laporan bug
+                        </p>
+                        <p class="mt-2 text-body-sm text-slate-500">
+                            Kendala teknis dari pengguna, lengkap dengan screenshot.
+                        </p>
+                    </Link>
+                    <Link
+                        :href="route('admin.messages')"
+                        class="group bg-white p-6 transition-colors duration-200 hover:bg-slate-50"
+                    >
+                        <p class="text-sub-sm font-semibold text-slate-900 group-hover:text-indigo-600">
+                            Pesan masuk
+                        </p>
+                        <p class="mt-2 text-body-sm text-slate-500">
+                            Pesan pengguna ke admin; tandai sudah dibaca setelah ditangani.
+                        </p>
+                    </Link>
+                    <Link
+                        :href="route('admin.audit')"
+                        class="group bg-white p-6 transition-colors duration-200 hover:bg-slate-50"
+                    >
+                        <p class="text-sub-sm font-semibold text-slate-900 group-hover:text-indigo-600">
+                            Audit log
+                        </p>
+                        <p class="mt-2 text-body-sm text-slate-500">
+                            Riwayat perubahan konten: siapa, kapan, dan apa yang diubah.
+                        </p>
+                    </Link>
                 </div>
             </section>
 
             <section class="mt-12">
-                <p class="eyebrow">Laporan jawaban terbaru</p>
+                <div class="flex flex-wrap items-baseline justify-between gap-3">
+                    <p class="eyebrow">Laporan jawaban terbaru</p>
+                    <Link :href="route('admin.reports')" class="link-quiet text-body-sm">
+                        Lihat semua
+                        <span aria-hidden="true">→</span>
+                    </Link>
+                </div>
                 <p v-if="!reports.length" class="mt-4 text-body-sm text-slate-500">
                     Belum ada laporan masuk.
                 </p>
