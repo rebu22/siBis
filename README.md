@@ -1,38 +1,86 @@
-# siBis — Sistem Informasi Konsultasi Hukum Bisnis
+# siBis — Sistem Informasi Konsultasi Hukum Bisnis Berbasis AI
 
-Company profile + chatbot konsultasi awal hukum bisnis untuk pelaku usaha di Indonesia
-(perpajakan, perizinan berusaha, pendirian badan usaha). Setiap jawaban wajib menyertakan
-dasar hukum dan disclaimer bahwa ini bukan pengganti advokat.
+Aplikasi web untuk pelaku usaha di Indonesia: konsultasi hukum bisnis awal
+(perpajakan, perizinan berusaha, pendirian badan usaha) dengan jawaban AI yang
+selalu menyertakan rujukan regulasi, ditambah perpustakaan kebijakan PDF,
+riwayat konsultasi, langganan premium, dan kanal bantuan.
 
-Panduan bahan presentasi ada di `PANDUAN_PRESENTASI.txt`.
+> Jawaban AI bukan pengganti advokat. Setiap jawaban menyertakan sumber dan
+> peringatan bahwa pengguna tetap perlu berkonsultasi dengan ahli hukum.
 
-Tumpukan: Laravel + Inertia + Vue 3 + Tailwind, basis data SQLite, dan microservice
-Python FastAPI opsional di `service/`.
+## Tumpukan
+
+| Bagian | Teknologi |
+|---|---|
+| `backend/` | Laravel 13, Inertia, session auth, SQLite/MySQL |
+| `frontend/` | Vue 3, Vite, Tailwind CSS, Plus Jakarta Sans |
+| `ai-service/` | FastAPI, ChromaDB (opsional), endpoint LLM kompatibel OpenAI |
+| Pembayaran | Midtrans Snap (sandbox default) |
+| Pengujian | PHPUnit (69 test) |
+
+## Struktur repositori
+
+```
+siBis/
+├── backend/        Laravel: app, routes, database, tests, public
+├── frontend/       Vue + Vite: src/Pages, src/Layouts, src/Components, src/css
+├── ai-service/     FastAPI: app.py, chroma/, kb.sqlite3, run.sh
+├── docs/           SRS baru, gap analysis, DFD, panduan operasional & Midtrans
+├── start.sh        menyalakan backend + ai-service sekaligus
+├── README.md
+└── ROADMAP.md
+```
 
 ## Menjalankan di komputer sendiri
 
-Butuh PHP 8.3, Composer, Node.js, dan ekstensi SQLite.
+Butuh PHP 8.3, Composer, Node.js 20+, Python 3.11+ (untuk layanan AI), dan
+ekstensi SQLite.
+
+### 1. Backend
 
 ```sh
+cd backend
 composer install
 cp .env.example .env
 php artisan key:generate
 touch database/database.sqlite
 php artisan migrate --seed
-npm install
-npm run build
 php artisan serve
 ```
 
-Buka `http://localhost:8000`.
+Buka <http://localhost:8000>.
 
-Untuk pengembangan tampilan, `npm run dev` lebih nyaman daripada `npm run build`
-(perubahan Vue/CSS langsung terlihat tanpa build ulang).
+### 2. Frontend
+
+```sh
+cd frontend
+npm install
+npm run build     # produksi
+# atau: npm run dev   (hot reload, jalankan bersamaan dengan php artisan serve)
+```
+
+Hasil build masuk ke `backend/public/build`; Laravel membacanya otomatis.
+
+### 3. Layanan AI (opsional)
+
+```sh
+cd ai-service
+python -m venv .venv
+.venv/bin/pip install -r requirements.txt
+./run.sh
+```
+
+`run.sh` membaca `RAG_TOKEN`, `LLM_BASE_URL`, `LLM_API_KEY`, dan `LLM_MODEL`
+dari `backend/.env`. Tanpa layanan AI, aplikasi tetap berjalan dan menampilkan
+pesan fallback `Layanan konsultasi sementara tidak tersedia.`
+
+Alternatif satu perintah dari akar repo: `./start.sh` (tambahkan `--restart`
+setelah mengubah `backend/.env`).
 
 ### Akun demo
 
-Dibuat oleh `php artisan migrate --seed`. Password keduanya `password` — **ganti
-sebelum dipakai di luar lokal**.
+Dibuat oleh `php artisan migrate --seed`. Password keduanya `password` —
+**ganti sebelum dipakai di luar lokal**.
 
 | Peran | Email | Password |
 |---|---|---|
@@ -41,76 +89,104 @@ sebelum dipakai di luar lokal**.
 
 ### Email
 
-Pendaftaran mengirim email verifikasi ke alamat yang diisi pengguna, jadi `MAIL_*` di `.env`
-harus diisi lebih dulu. Contoh untuk Gmail ada di `.env.example` (butuh App Password Gmail
-16 karakter, bukan password akun biasa).
+Pendaftaran mengirim email verifikasi. Isi `MAIL_*` di `backend/.env`; contoh
+Gmail ada di `.env.example` (butuh App Password 16 karakter). Bawaan
+`MAIL_MAILER=failover`: kalau SMTP gagal, pesan jatuh ke
+`backend/storage/logs/laravel.log` dan pendaftaran tetap berhasil.
 
-Bawaan `MAIL_MAILER=failover` artinya kalau SMTP gagal, pengiriman jatuh ke log: pendaftaran
-tetap berhasil, tetapi email tidak sampai ke inbox. Isi email yang gagal bisa dilihat di
-`storage/logs/laravel.log`.
+## Alur pengguna
 
-### Layanan AI (opsional)
-
-Halaman konsultasi memanggil microservice Python di `service/` lewat `RAG_URL`
-(bawaan `http://127.0.0.1:8001`). Kalau layanan itu tidak dinyalakan, aplikasi tetap jalan
-dan menampilkan pesan fallback — tidak error.
-
-Model penjawabnya diatur lewat `LLM_BASE_URL`, `LLM_MODEL`, dan `LLM_API_KEY` di `.env`
-(endpoint kompatibel OpenAI). `start.sh` menyalakan aplikasi dan layanan AI sekaligus, aman
-dijalankan berulang, dan memakai `bash start.sh --restart` setelah `.env` diubah.
-
-## Alur pemakaian pengguna
-
-1. **Beranda** `/` — profil perusahaan: visi, misi, layanan, kontak, dan artikel terbaru.
-2. **Artikel** `/artikel` — daftar artikel terbit, bisa dicari lewat kata kunci (`q`) dan
-   disaring per kategori. Detail artikel di `/artikel/{slug}`.
-3. **Daftar** `/register` — isi nama, email, password, nama usaha, dan kota. Setelah berhasil,
-   pengguna otomatis login dan diarahkan ke konsultasi.
-4. **Verifikasi email** — buka tautan di email yang dikirim saat daftar
-   (`/verify-email/{id}/{hash}`). Tautan terikat ke host saat dikirim, jadi harus dibuka lewat
-   alamat yang sama dengan saat mendaftar. Kalau belum masuk, tombol **Kirim ulang email
-   verifikasi** ada di halaman itu.
-5. **Masuk** `/login` — setelah login langsung ke halaman konsultasi. Lupa password lewat
-   `/forgot-password`, yang mengirim tautan reset berbatas waktu.
-6. **Konsultasi** `/konsultasi` — tulis pertanyaan, jawaban AI muncul beserta dasar hukum dan
-   disclaimer, lalu tersimpan otomatis ke riwayat.
-7. **Riwayat** `/riwayat` — daftar sesi konsultasi; `/riwayat/{id}` untuk membuka percakapan.
-   Tiap jawaban bisa dinilai atau dilaporkan sebagai tidak akurat.
-8. **Profil** `/profile` — ubah data usaha dan kontak, ganti password, atau hapus akun
-   beserta seluruh datanya.
+1. **Beranda** `/` — profil perusahaan (visi, misi, layanan, kontak) dan
+   kebijakan terbaru.
+2. **Kebijakan** `/kebijakan` — daftar regulasi PDF, cari lewat `q`, saring
+   kategori; detail di `/kebijakan/{slug}`.
+3. **Daftar & verifikasi** `/register` → tautan verifikasi email.
+4. **Masuk** `/login`, lupa password `/forgot-password`.
+5. **Konsultasi** `/konsultasi` — kuota gratis 5 pertanyaan/hari; jawaban
+   menyertakan sumber. Kuota tidak dipotong bila layanan AI mati.
+6. **Riwayat** `/riwayat` — buka, hapus satu, atau hapus semua percakapan.
+   Setiap jawaban bisa dinilai (1–5) atau dilaporkan tidak akurat.
+7. **Premium** `/premium` — 100 pertanyaan/hari selama 30 hari, bayar lewat
+   Midtrans (QRIS/VA/e-wallet). Aktif otomatis setelah pembayaran lunas.
+8. **Bantuan** — `/lapor-bug` (boleh tanpa akun) dan `/hubungi-admin`
+   (wajib login).
+9. **Profil** `/profile` — ubah data, ganti password, atau hapus akun beserta
+   seluruh datanya.
 
 ## Alur admin
 
-1. Masuk memakai akun berperan `admin` (mis. `admin@sibis.test`).
-2. Membuka `/admin` akan mengarahkan ke `/admin/verifikasi`. Klik kirim kode, lalu lihat kode
-   6 digit yang dikirim ke email admin.
-3. Kode berlaku **5 menit**, maksimal **5 percobaan**, dan kode lama langsung tidak berlaku saat
-   kode baru diminta. Setelah lolos, verifikasi berlaku **30 menit** sebelum diminta lagi.
-4. Dashboard admin menampilkan jumlah pengguna, sesi chat, pesan, laporan berstatus `baru`,
-   jumlah artikel, dan 10 laporan terbaru.
+1. Login dengan akun berperan `admin`, lalu buka `/admin`.
+2. Verifikasi OTP: kode 6 digit berlaku 5 menit, maksimal 5 percobaan; sesi
+   admin berlaku 30 menit sebelum diminta lagi.
+3. Menu admin:
+   - `/admin/pengguna` — paket, kuota hari ini, status verifikasi.
+   - `/admin/kebijakan` — unggah/ubah/hapus PDF, indeks ulang ke basis
+     pengetahuan chatbot.
+   - `/admin/profil` — edit visi, misi, layanan, dan kontak publik.
+   - `/admin/laporan` — tindak lanjut laporan jawaban AI.
+   - `/admin/laporan-bug` — laporan bug + screenshot.
+   - `/admin/pesan` — kotak masuk pesan pengguna.
+   - `/admin/pembayaran` — transaksi Midtrans & pendapatan lunas.
+   - `/admin/audit` — jejak perubahan konten (metadata saja).
 
-5. **Pengguna** `/admin/pengguna` — daftar akun beserta paket, pemakaian kuota hari ini,
-   status verifikasi, dan jumlah percakapan. Bisa dicari lewat nama atau email.
-6. **Artikel** `/admin/artikel` — tulis, ubah, terbitkan, dan hapus artikel. Slug dibuat
-   otomatis dari judul dan dibuat unik; artikel berstatus draf tidak tampil di `/artikel`.
-
-Yang belum dibangun: unggah PDF regulasi ke basis pengetahuan, monitoring pembayaran premium,
-laporan bug, dan pesan pengguna ke admin. Bagian itu sengaja tidak diberi tombol supaya tidak
-menyesatkan.
-
-Untuk menjadikan akun lain sebagai admin:
+Menjadikan akun lain admin:
 
 ```sh
+cd backend
 php artisan tinker --execute='\App\Models\User::where("email","alamat@contoh.com")->first()->forceFill(["role"=>"admin"])->save();'
 ```
 
-## Struktur singkat
+## Midtrans
 
-| Jalur | Isi |
+Panduan lengkap: [`docs/MIDTRANS.md`](docs/MIDTRANS.md). Ringkasnya:
+
+```env
+MIDTRANS_SERVER_KEY=SB-Mid-server-xxxxxxxx
+MIDTRANS_CLIENT_KEY=SB-Mid-client-xxxxxxxx
+MIDTRANS_IS_PRODUCTION=false
+MIDTRANS_PREMIUM_PRICE=49000
+MIDTRANS_PREMIUM_DAYS=30
+```
+
+Tanpa `MIDTRANS_SERVER_KEY`, tombol bayar otomatis nonaktif dan tidak ada
+transaksi yang dibuat.
+
+## Operasional
+
+Panduan lengkap: [`docs/OPERASIONAL.md`](docs/OPERASIONAL.md).
+
+```sh
+cd backend
+php artisan sibis:backup    # snapshot DB + prune retensi 30 hari
+php artisan sibis:health    # cek DB dan layanan RAG
+```
+
+Scheduler (cron server):
+
+```cron
+* * * * * cd /path/ke/siBis/backend && php artisan schedule:run >> /dev/null 2>&1
+```
+
+Backup harian 02:30, health check tiap 5 menit. Metrik LLM ditulis ke
+`backend/storage/logs/metrics-*.log` (tanpa isi pertanyaan).
+
+## Pengujian
+
+```sh
+cd backend
+php artisan test
+```
+
+69 test mencakup auth, kuota, IDOR riwayat, injeksi pencarian, CMS, premium,
+webhook Midtrans, bug/pesan, audit log, backup, PII, dan health check.
+
+## Dokumentasi
+
+| Berkas | Isi |
 |---|---|
-| `app/Http/Controllers` | controller web (Home, Article, Consultation, Profile, Admin) |
-| `app/Http/Middleware` | `EnsureAdmin` (role + OTP) dan `SecurityHeaders` (CSP ber-nonce) |
-| `app/Models` | User, Article, CompanyProfile, ChatSession, ChatMessage, AnswerReport, OtpCode |
-| `resources/js/Pages` | halaman Inertia/Vue |
-| `service/` | microservice RAG FastAPI (opsional) |
-| `docs/` | DFD dan catatan rancangan |
+| `docs/SRS_siBis.md` | SRS baru sesuai implementasi final |
+| `docs/GAP_ANALYSIS.md` | Riwayat audit SRS lama vs kode, checklist RF/UC/NFR |
+| `docs/DFD.md` | DFD Level 0–2 (Mermaid) |
+| `docs/MIDTRANS.md` | Setup & alur pembayaran |
+| `docs/OPERASIONAL.md` | Backup, metrik, health check, PII |
+| `SRS_11241029.pdf` | SRS lama (arsip) |

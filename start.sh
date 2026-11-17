@@ -14,8 +14,8 @@ if [ "${1:-}" = "--restart" ]; then
   sleep 2
 fi
 
-up 8000        || { setsid nohup php artisan serve --host=127.0.0.1 --port=8000 >/tmp/sibis.log 2>&1 </dev/null & echo "aplikasi: dinyalakan"; }
-up 8001/health || { setsid nohup bash service/run.sh >/tmp/rag.log 2>&1 </dev/null & echo "layanan AI: dinyalakan"; }
+up 8000        || { setsid nohup sh -c 'cd backend && exec php artisan serve --host=127.0.0.1 --port=8000' >/tmp/sibis.log 2>&1 </dev/null & echo "aplikasi: dinyalakan"; }
+up 8001/health || { setsid nohup bash ai-service/run.sh >/tmp/rag.log 2>&1 </dev/null & echo "layanan AI: dinyalakan"; }
 
 for p in 8000 8001/health; do
   for _ in $(seq 40); do up "$p" && break; sleep 1; done

@@ -1,34 +1,56 @@
-# ROADMAP siBis (dari SRS saja)
+# ROADMAP siBis
 
-Saran: **bertahap**. Jangan langsung code penuh. Alasan: RAG + payment + 2FA rawan rework kalau DB/kontrak API belum fix.
-Format: pakai `.md` ini, bukan `.txt` — render rapi di GitHub, bisa checklist, jadi acuan commit.
+Status: **fitur selesai**, tinggal penyesuaian deployment. Dokumen ini mencatat
+urutan pengerjaan yang sudah dilalui, bukan rencana kosong.
 
-## Fase 0 — Fondasi (sekarang)
-- [x] SRS dibaca (55 hal, RF-01..21, UC-01..24, NFR-01..22)
-- [x] README disesuaikan konteks hukum AI
-- [x] DFD Level 0-1-2 dari SRS (`docs/DFD.md`)
-- [ ] SDD siBis asli (kalau ada, taruh di sini). Contoh SATSET sudah dihapus biar tidak bingung.
+## Fase 0 — Fondasi
+- [x] SRS lama dibaca (RF-01..27, UC-01..25, NFR-01..25)
+- [x] Audit gap SRS vs kode (`docs/GAP_ANALYSIS.md`)
+- [x] README, DFD, dan panduan operasional
 
-## Fase 1 — Kontrak data (sebelum code)
-- [ ] Skema MySQL: users, chat_history, articles, transactions, profiles, bug_reports, messages, ratings
-- [ ] Skema ChromaDB: collection dokumen_hukum (chunk + metadata judul/nomor/tahun/kategori)
-- [ ] Kontrak Laravel<->FastAPI: `POST /rag/ask`, `POST /rag/ingest`, format JSON + auth internal
-- [ ] Aturan kuota Free vs Premium + status langganan
+## Fase 1 — Kontrak data
+- [x] Skema: users, chat_sessions, chat_messages, regulations, transactions,
+      company_profiles, bug_reports, contact_messages, answer_ratings,
+      answer_reports, audit_logs, otp_codes
+- [x] Indeks RAG: ChromaDB (vektor) + `kb.sqlite3` (kata kunci)
+- [x] Kontrak Laravel ↔ FastAPI: `/rag/ask`, `/rag/ingest/pdf`,
+      `/rag/documents`, token internal
+- [x] Kuota Free 5/hari, Premium 100/hari, masa aktif `premium_until`
 
 ## Fase 2 — Scaffolding
-- [ ] Laravel + Inertia + Vue skeleton, auth session + Sanctum, 2FA OTP admin
-- [ ] Halaman publik: home profil singkat + chatbot kanan-bawah, artikel list/search/detail
-- [ ] FastAPI skeleton: ingest PDF, retrieval, panggil LLM API, fallback `Layanan konsultasi sementara tidak tersedia`
+- [x] Laravel + Inertia + Vue + Tailwind
+- [x] Auth session, verifikasi email, reset password, 2FA OTP admin
+- [x] Halaman publik: beranda, kebijakan PDF, detail
+- [x] FastAPI: ingest PDF, retrieval, LLM, fallback saat layanan mati
 
-## Fase 3 — Fitur inti (urut UC)
-1. UC-01/02/04/05/06 auth (register verifikasi, login lock, logout, reset, hapus akun)
-2. UC-07/08/09/10/11 chat AI + history + rating + lapor jawaban
-3. UC-12/13 premium + monitoring pembayaran
-4. UC-14..18 admin CMS (upload PDF KB, CRUD artikel, edit profil)
-5. UC-19/20 publik + UC-21..25 bug/pesan + hapus dokumen hukum
+## Fase 3 — Fitur inti
+- [x] Auth: register, login, logout, reset, hapus akun
+- [x] Konsultasi AI, riwayat, hapus riwayat, rating, lapor jawaban
+- [x] Premium: Midtrans Snap, webhook, aktivasi otomatis, monitoring admin
+- [x] CMS: unggah/ubah/hapus kebijakan PDF, edit profil perusahaan
+- [x] Publik: cari kebijakan, detail PDF
+- [x] Bantuan: lapor bug + screenshot, pesan ke admin, kotak masuk admin
 
-## Fase 4 — NFR / QA
-- Home ≤5 dtk, chat ≤10 dtk, 24x7, responsif 360px, Chrome/FF/Edge/Safari
-- Bcrypt/Argon2, HTTPS, UU PDP, anonim ke LLM, anti-halusinasi traceable, logging tanpa data sensitif
+## Fase 4 — Non-fungsional
+- [x] Password hash, HTTPS/HSTS saat secure, security headers + CSP nonce
+- [x] Token internal Laravel ↔ FastAPI
+- [x] Anti-halusinasi: prompt wajib merujuk konteks + sitasi
+- [x] Fallback saat LLM mati tanpa memotong kuota
+- [x] Redaksi PII (email, telepon, NIK, NPWP) sebelum kirim ke LLM
+- [x] Audit log perubahan konten admin
+- [x] Metrik latensi/status LLM, health check, alerting ke log
+- [x] Backup harian + retensi 30 hari
+- [x] Aksesibilitas dasar: kontras, fokus keyboard, label
 
-Tiap fase = 1+ commit `fase: ...`. Update checklist ini tiap push.
+## Fase 5 — Rapikan & SRS baru
+- [x] Pisah folder `backend/`, `frontend/`, `ai-service/`
+- [x] README, ROADMAP, DFD diperbarui
+- [x] SRS baru sesuai implementasi (`docs/SRS_siBis.md`)
+
+## Sisa pekerjaan deployment (bukan fitur)
+- [ ] Isi kredensial Midtrans produksi dan URL webhook
+- [ ] Pasang HTTPS di reverse proxy (NFR-10)
+- [ ] Ukur latensi nyata di hosting (NFR-07/08)
+- [ ] Audit WCAG 2.1 AA penuh (NFR-25)
+- [ ] Evaluasi kualitas jawaban AI berkala (NFR-12)
+- [ ] Salin backup ke luar server (S3/rsync)

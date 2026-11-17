@@ -1,6 +1,0 @@
-fastapi
-uvicorn[standard]
-httpx
-python-multipart  # unggah PDF dari CMS admin (multipart/form-data)
-# Opsional, untuk retrieval: pip install chromadb
-pypdf  # opsional, hanya untuk service/add_pdf.py

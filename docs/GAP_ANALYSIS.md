@@ -19,7 +19,7 @@ Status: `[x]` selesai · `[~]` sebagian · `[ ]` belum ada
 | RF-04 | Detail artikel | [x] | `RegulationController@show` |
 | RF-05 | Bertanya ke AI | [x] | `ConsultationController@ask` |
 | RF-06 | Proses RAG | [x] | `RagClient` → FastAPI `/rag/ask`, sumber disimpan di `chat_messages.sources` |
-| RF-07 | Berlangganan Premium | [ ] | Kolom `plan`/`premium_until` ada, tapi **tanpa payment gateway & UI**. Tombol "Segera hadir" |
+| RF-07 | Berlangganan Premium | [x] | `/premium` + Midtrans Snap (sandbox default), aktivasi otomatis via webhook/status API |
 | RF-08 | Laporkan bug | [x] | `/lapor-bug` (publik) + screenshot di disk `public/lapor-bug` |
 | RF-09 | Kirim pesan ke admin | [x] | `/hubungi-admin` (wajib login) + `ContactMessage` |
 | RF-10 | Login + anti brute-force | [x] | `LoginRequest` + `RateLimiter` (5 percobaan) |
@@ -33,7 +33,7 @@ Status: `[x]` selesai · `[~]` sebagian · `[ ]` belum ada
 | RF-18 | Unggah dokumen hukum | [x] | PDF + `RagClient::ingestPdf`; batas kode **20 MB**, SRS 10 MB |
 | RF-19 | Admin terima laporan bug | [x] | `/admin/laporan-bug`: filter status, catatan admin, audit log |
 | RF-20 | Admin terima pesan user | [x] | `/admin/pesan`: kotak masuk, filter, tandai dibaca/belum |
-| RF-21 | Monitoring pembayaran | [ ] | Belum ada tabel transaksi & UI |
+| RF-21 | Monitoring pembayaran | [x] | `/admin/pembayaran`: pendapatan lunas, transaksi tertunda, filter status |
 | RF-22 | Hapus akun + data | [x] | `ProfileController@destroy`, cascade ke sesi chat |
 | RF-23 | Lihat riwayat konsultasi | [x] | `ConsultationController@history` / `show` |
 | RF-24 | Hapus riwayat konsultasi | [x] | `history.destroy` + `history.destroyAll`, tombol di daftar & detail riwayat |
@@ -41,7 +41,7 @@ Status: `[x]` selesai · `[~]` sebagian · `[ ]` belum ada
 | RF-26 | Laporkan jawaban AI | [x] | User melapor; admin meninjau & mengubah status di `/admin/laporan` |
 | RF-27 | Hapus dokumen hukum | [x] | `destroyRegulation` + hapus dari RAG; SRS minta berkas **diarsipkan**, kode menghapus file |
 
-**Ringkasan: 25 selesai, 2 belum.**
+**Ringkasan: 27 selesai, 0 belum.**
 
 ---
 
@@ -60,8 +60,8 @@ Status: `[x]` selesai · `[~]` sebagian · `[ ]` belum ada
 | UC-09 | Hapus riwayat | [x] |
 | UC-10 | Rating jawaban | [x] |
 | UC-11 | Lapor jawaban AI | [x] (user) |
-| UC-12 | Berlangganan premium | [ ] |
-| UC-13 | Monitoring pembayaran | [ ] |
+| UC-12 | Berlangganan premium | [x] |
+| UC-13 | Monitoring pembayaran | [x] |
 | UC-14 | Unggah dokumen hukum | [x] |
 | UC-15 | Buat artikel | [x] (bentuk PDF) |
 | UC-16 | Edit artikel | [x] (bentuk PDF) |
@@ -84,14 +84,14 @@ Status: `[x]` selesai · `[~]` sebagian · `[ ]` belum ada
 | NFR-09 | Hash password Bcrypt/Argon2 | [x] | `'password' => 'hashed'` |
 | NFR-10 | HTTPS/TLS | [~] | HSTS hanya saat `isSecure()`; tergantung deployment |
 | NFR-12 | Anti-halusinasi + sumber | [~] | Prompt + sitasi; belum ada evaluasi otomatis |
-| NFR-16 | Anonimisasi ke LLM | [~] | Hanya teks pertanyaan yang dikirim; belum ada penyaring PII |
+| NFR-16 | Anonimisasi ke LLM | [x] | `PiiFilter` meredaksi email/telepon/NIK/NPWP pada pertanyaan & riwayat; pesan asli tetap di DB |
 | NFR-17 | Fallback saat LLM mati | [x] | `degraded` answer, kuota tidak dipotong |
-| NFR-18 | Log request/response LLM | [ ] | Hanya log kegagalan |
-| NFR-19 | Log latensi & status per request | [ ] | Belum ada |
-| NFR-20 | Metrik & alerting | [ ] | Belum ada |
+| NFR-18 | Log request/response LLM | [x] | Channel `metrics`: status, durasi, jumlah sumber, panjang jawaban — tanpa isi teks |
+| NFR-19 | Log latensi & status per request | [x] | `RagClient` mencatat `duration_ms` + status per panggilan |
+| NFR-20 | Metrik & alerting | [x] | `sibis:health` tiap 5 menit (log `critical`); RAG lambat memicu warning |
 | NFR-21 | Audit log perubahan konten | [x] | `AuditLog::record()` dipanggil di semua aksi tulis admin; halaman `/admin/audit` |
 | NFR-23 | Token internal Laravel↔FastAPI | [x] | `RAG_TOKEN`, `_auth()` |
-| NFR-24 | Backup harian, retensi 30 hari | [ ] | Belum ada jadwal/konfigurasi |
+| NFR-24 | Backup harian, retensi 30 hari | [x] | `sibis:backup` harian 02:30, disk `backups`, prune otomatis |
 | NFR-25 | WCAG 2.1 AA | [~] | Ada `ContrastTest`, fokus keyboard, label; belum diaudit penuh |
 | NFR-07/08 | Home ≤5 dtk, chat ≤10 dtk | [~] | Tergantung model LLM & hosting; belum diukur |
 
@@ -112,11 +112,17 @@ Status: `[x]` selesai · `[~]` sebagian · `[ ]` belum ada
 
 ## 5. Dokumentasi yang sudah usang
 
-- `README.md` masih menyebut `/artikel`, halaman artikel, dan `PANDUAN_PRESENTASI.txt`
-  (file tidak ada). Juga menulis "unggah PDF belum dibangun" padahal sudah ada.
-- `ROADMAP.md` merujuk `docs/DFD.md` yang tidak ada (`docs/` kosong).
-- Struktur folder belum dipisah `frontend/` + `backend/` + `ai-service/`
-  (rencana ini ditunda sampai fitur selesai).
+Dokumen lama sudah diperbarui pada Fase E:
+
+- `README.md` ditulis ulang: struktur `backend/` + `frontend/` + `ai-service/`,
+  alur pengguna/admin, Midtrans, operasional, dan pengujian.
+- `ROADMAP.md` ditulis ulang: semua fase ditandai selesai; sisa hanya item
+  deployment.
+- `docs/DFD.md` dibuat: DFD Level 0–2 + kamus data.
+- Folder sudah dipisah menjadi `backend/`, `frontend/`, dan `ai-service/`.
+
+Yang sengaja dibiarkan sebagai arsip: `SRS_11241029.pdf` di akar repo
+(dokumen asli yang digantikan). SRS pengganti ada di `docs/SRS_siBis.md`.
 
 ---
 
@@ -134,17 +140,17 @@ Status: `[x]` selesai · `[~]` sebagian · `[ ]` belum ada
 - [x] RF-09 / UC-22: form pesan ke admin
 - [x] RF-20 / UC-24: kotak masuk admin + tandai dibaca
 
-### Fase C — Premium
-- [ ] RF-07 / UC-12: pilih payment gateway, tabel `transactions`, halaman paket
-- [ ] RF-21 / UC-13: monitoring transaksi & status langganan di admin
-- [ ] Aktivasi `premium_until` otomatis dari webhook pembayaran
+### Fase C — Premium — SELESAI
+- [x] RF-07 / UC-12: pilih payment gateway, tabel `transactions`, halaman paket
+- [x] RF-21 / UC-13: monitoring transaksi & status langganan di admin
+- [x] Aktivasi `premium_until` otomatis dari webhook pembayaran
 
-### Fase D — Operasional
-- [ ] NFR-24: backup harian + retensi 30 hari
-- [ ] NFR-18/19/20: logging latensi, metrik, alerting
-- [ ] NFR-16: penyaring PII sebelum kirim ke LLM
+### Fase D — Operasional — SELESAI
+- [x] NFR-24: backup harian + retensi 30 hari
+- [x] NFR-18/19/20: logging latensi, metrik, alerting
+- [x] NFR-16: penyaring PII sebelum kirim ke LLM
 
-### Fase E — Rapikan
-- [ ] Update README, ROADMAP, buat DFD
-- [ ] Pisah folder `frontend/`, `backend/`, `ai-service/`
-- [ ] Tulis ulang SRS sesuai implementasi final
+### Fase E — Rapikan — SELESAI
+- [x] Update README, ROADMAP, buat DFD
+- [x] Pisah folder `frontend/`, `backend/`, `ai-service/`
+- [x] Tulis ulang SRS sesuai implementasi final
