@@ -1,6 +1,6 @@
 <script setup>
-import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
-import { Head, router } from '@inertiajs/vue3';
+import PublicLayout from '@/Layouts/PublicLayout.vue';
+import { Head, Link, router } from '@inertiajs/vue3';
 import { ref } from 'vue';
 
 const props = defineProps({
@@ -11,6 +11,7 @@ const props = defineProps({
     days: { type: Number, default: 30 },
     configured: { type: Boolean, default: false },
     transactions: { type: Array, default: () => [] },
+    isGuest: { type: Boolean, default: false },
 });
 
 const memproses = ref(false);
@@ -57,7 +58,7 @@ function tanggal(iso) {
 </script>
 
 <template>
-    <AuthenticatedLayout>
+    <PublicLayout>
         <Head title="Paket Premium" />
 
         <template #header>
@@ -131,27 +132,41 @@ function tanggal(iso) {
                         </li>
                     </ul>
 
-                    <button
-                        type="button"
+                    <Link
+                        v-if="isGuest"
+                        :href="route('register')"
                         class="btn-primary mt-8 w-full"
-                        :disabled="!configured || memproses"
-                        @click="bayar"
                     >
-                        {{ memproses ? 'Menyiapkan pembayaran…' : 'Bayar dengan Midtrans' }}
-                    </button>
+                        Daftar untuk berlangganan
+                    </Link>
+                    <p v-if="isGuest" class="mt-3 text-caption text-slate-500">
+                        Pembelian butuh akun agar masa aktif dan riwayat pembayaran
+                        tersimpan. Gratis, tanpa kartu kredit.
+                    </p>
 
-                    <p v-if="!configured" class="mt-3 text-caption text-amber-700">
-                        Pembayaran belum dikonfigurasi. Isi MIDTRANS_SERVER_KEY di
-                        environment, lalu coba lagi.
-                    </p>
-                    <p v-else class="mt-3 text-caption text-slate-500">
-                        Kamu akan diarahkan ke halaman pembayaran Midtrans. Setelah
-                        selesai, kembali ke siBis untuk melihat statusnya.
-                    </p>
+                    <template v-else>
+                        <button
+                            type="button"
+                            class="btn-primary mt-8 w-full"
+                            :disabled="!configured || memproses"
+                            @click="bayar"
+                        >
+                            {{ memproses ? 'Menyiapkan pembayaran…' : 'Bayar dengan Midtrans' }}
+                        </button>
+
+                        <p v-if="!configured" class="mt-3 text-caption text-amber-700">
+                            Pembayaran belum dikonfigurasi. Isi MIDTRANS_SERVER_KEY di
+                            environment, lalu coba lagi.
+                        </p>
+                        <p v-else class="mt-3 text-caption text-slate-500">
+                            Kamu akan diarahkan ke halaman pembayaran Midtrans. Setelah
+                            selesai, kembali ke siBis untuk melihat statusnya.
+                        </p>
+                    </template>
                 </section>
             </div>
 
-            <section class="mt-12">
+            <section v-if="!isGuest" class="mt-12">
                 <p class="eyebrow">Riwayat pembayaran</p>
 
                 <p v-if="!transactions.length" class="mt-4 text-body-sm text-slate-500">
@@ -206,5 +221,5 @@ function tanggal(iso) {
                 </div>
             </section>
         </div>
-    </AuthenticatedLayout>
+    </PublicLayout>
 </template>

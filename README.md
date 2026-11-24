@@ -16,7 +16,7 @@ riwayat konsultasi, langganan premium, dan kanal bantuan.
 | `frontend/` | Vue 3, Vite, Tailwind CSS, Plus Jakarta Sans |
 | `ai-service/` | FastAPI, ChromaDB (opsional), endpoint LLM kompatibel OpenAI |
 | Pembayaran | Midtrans Snap (sandbox default) |
-| Pengujian | PHPUnit (69 test) |
+| Pengujian | PHPUnit (75 test) |
 
 ## Struktur repositori
 
@@ -71,8 +71,11 @@ python -m venv .venv
 ```
 
 `run.sh` membaca `RAG_TOKEN`, `LLM_BASE_URL`, `LLM_API_KEY`, dan `LLM_MODEL`
-dari `backend/.env`. Tanpa layanan AI, aplikasi tetap berjalan dan menampilkan
-pesan fallback `Layanan konsultasi sementara tidak tersedia.`
+dari `backend/.env`. Isi `LLM_FALLBACK_MODEL` (opsional) untuk model cadangan
+saat penyedia utama membalas 429/503; `LLM_FALLBACK_BASE_URL` +
+`LLM_FALLBACK_API_KEY` bila cadangannya penyedia lain. Tanpa layanan AI,
+aplikasi tetap berjalan dan menampilkan pesan fallback
+`Layanan konsultasi sementara tidak tersedia.`
 
 Alternatif satu perintah dari akar repo: `./start.sh` (tambahkan `--restart`
 setelah mengubah `backend/.env`).
@@ -102,14 +105,18 @@ Gmail ada di `.env.example` (butuh App Password 16 karakter). Bawaan
    kategori; detail di `/kebijakan/{slug}`.
 3. **Daftar & verifikasi** `/register` → tautan verifikasi email.
 4. **Masuk** `/login`, lupa password `/forgot-password`.
-5. **Konsultasi** `/konsultasi` — kuota gratis 5 pertanyaan/hari; jawaban
-   menyertakan sumber. Kuota tidak dipotong bila layanan AI mati.
-6. **Riwayat** `/riwayat` — buka, hapus satu, atau hapus semua percakapan.
-   Setiap jawaban bisa dinilai (1–5) atau dilaporkan tidak akurat.
-7. **Premium** `/premium` — 100 pertanyaan/hari selama 30 hari, bayar lewat
-   Midtrans (QRIS/VA/e-wallet). Aktif otomatis setelah pembayaran lunas.
-8. **Bantuan** — `/lapor-bug` (boleh tanpa akun) dan `/hubungi-admin`
-   (wajib login).
+5. **Konsultasi** `/konsultasi` — bisa dicoba tanpa akun. Tamu dikenali dari
+   cookie 30 hari: kuota 5 pertanyaan/hari, riwayat tersimpan di browser itu.
+   Pengguna login memakai kuota akun; jawaban menyertakan sumber dan kuota
+   tidak dipotong bila layanan AI mati.
+6. **Riwayat** `/riwayat` — buka, hapus satu, atau hapus semua percakapan
+   milik akun/cookie sendiri. Setiap jawaban bisa dinilai (1–5) atau
+   dilaporkan tidak akurat.
+7. **Premium** `/premium` — 100 pertanyaan/hari selama 30 hari. Halaman paket
+   terbuka untuk tamu; pembelian tetap butuh akun agar masa aktif tersimpan.
+   Bayar lewat Midtrans (QRIS/VA/e-wallet), aktif otomatis setelah lunas.
+8. **Bantuan** — `/lapor-bug` dan `/hubungi-admin` terbuka tanpa akun. Tamu
+   mengisi nama+email agar admin bisa membalas lewat email.
 9. **Profil** `/profile` — ubah data, ganti password, atau hapus akun beserta
    seluruh datanya.
 
@@ -157,8 +164,9 @@ Panduan lengkap: [`docs/OPERASIONAL.md`](docs/OPERASIONAL.md).
 
 ```sh
 cd backend
-php artisan sibis:backup    # snapshot DB + prune retensi 30 hari
-php artisan sibis:health    # cek DB dan layanan RAG
+php artisan sibis:backup        # snapshot DB + prune retensi 30 hari
+php artisan sibis:health        # cek DB dan layanan RAG
+php artisan sibis:purge-guests  # hapus percakapan tamu > 30 hari
 ```
 
 Scheduler (cron server):
@@ -167,8 +175,9 @@ Scheduler (cron server):
 * * * * * cd /path/ke/siBis/backend && php artisan schedule:run >> /dev/null 2>&1
 ```
 
-Backup harian 02:30, health check tiap 5 menit. Metrik LLM ditulis ke
-`backend/storage/logs/metrics-*.log` (tanpa isi pertanyaan).
+Backup harian 02:30, health check tiap 5 menit, pembersihan data tamu 03:00.
+Metrik LLM ditulis ke `backend/storage/logs/metrics-*.log` (tanpa isi
+pertanyaan).
 
 ## Pengujian
 
@@ -177,8 +186,9 @@ cd backend
 php artisan test
 ```
 
-69 test mencakup auth, kuota, IDOR riwayat, injeksi pencarian, CMS, premium,
-webhook Midtrans, bug/pesan, audit log, backup, PII, dan health check.
+75 test mencakup auth, kuota tamu/akun, isolasi riwayat per cookie, IDOR,
+injeksi pencarian, CMS, premium, webhook Midtrans, bug/pesan, audit log,
+backup, retensi tamu, PII, dan health check.
 
 ## Dokumentasi
 

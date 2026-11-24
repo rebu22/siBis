@@ -33,9 +33,12 @@ kepada pengembang, penguji, dosen pembimbing, dan pemilik produk.
   kebijakan.
 - Akun: registrasi, verifikasi email, login/logout, reset password, hapus akun.
 - Konsultasi AI: tanya-jawab dengan rujukan regulasi, kuota harian, riwayat,
-  penilaian, dan pelaporan jawaban.
+  penilaian, dan pelaporan jawaban. Tamu (tanpa akun) boleh mencoba dengan
+  kuota 5/hari dan riwayat berbasis cookie 30 hari.
 - Langganan premium: pembayaran Midtrans, aktivasi otomatis, monitoring admin.
-- Bantuan: laporan bug (publik) dan pesan ke admin (wajib login).
+  Halaman paket dapat dilihat tamu; pembelian tetap wajib akun.
+- Bantuan: laporan bug (publik) dan pesan ke admin (publik; tamu mengisi
+  nama+email).
 - Area admin: OTP dua faktor, CMS kebijakan PDF, CMS profil perusahaan,
   tindak lanjut laporan, kotak masuk, monitoring pembayaran, audit log.
 - Operasional: backup harian, metrik LLM, health check, redaksi PII.
@@ -106,10 +109,10 @@ Midtrans bertindak sebagai penyedia pembayaran eksternal; penyedia LLM
 
 | Kelompok | Fungsi |
 |---|---|
-| Publik | Profil perusahaan, daftar/cari/detail kebijakan PDF, lapor bug |
+| Publik | Profil perusahaan, daftar/cari/detail kebijakan PDF, lapor bug, pesan ke admin |
 | Akun | Registrasi, verifikasi email, login, logout, reset password, hapus akun |
-| Konsultasi | Tanya AI, rujukan sumber, kuota, riwayat, hapus riwayat, rating, lapor jawaban |
-| Premium | Halaman paket, checkout Midtrans, aktivasi otomatis, riwayat pembayaran |
+| Konsultasi | Tanya AI (akun atau tamu), rujukan sumber, kuota, riwayat, hapus riwayat, rating, lapor jawaban |
+| Premium | Halaman paket (publik), checkout Midtrans, aktivasi otomatis, riwayat pembayaran |
 | Bantuan | Pesan ke admin, kotak masuk admin, tindak lanjut laporan bug |
 | Admin | OTP, dasbor, pengguna, CMS kebijakan, CMS profil, laporan, pembayaran, audit |
 | Operasional | Backup harian, prune retensi, metrik LLM, health check, redaksi PII |
@@ -263,14 +266,14 @@ erDiagram
 | `business_profiles` | user_id, business_name, business_type, city | Data usaha saat registrasi |
 | `company_profiles` | name, vision, mission, services, contact_email, contact_phone, address | Satu baris, diedit CMS |
 | `regulations` | title, slug, category, excerpt, file_path, file_size, status, published_at, rag_doc_id | Menggantikan tabel `articles` |
-| `chat_sessions` | user_id, title | Satu sesi = satu percakapan |
+| `chat_sessions` | user_id, guest_token, title | Satu sesi = satu percakapan; `user_id` null untuk tamu |
 | `chat_messages` | chat_session_id, role, body, sources, degraded, created_at | `sources` JSON, `degraded` boolean |
-| `answer_ratings` | chat_message_id, user_id, score, comment | Unik per pesan per user |
-| `answer_reports` | chat_message_id, user_id, reason, note, status | Status: baru/proses/selesai |
+| `answer_ratings` | chat_message_id, user_id, guest_token, score, comment | Unik per pesan per akun; tamu dibedakan `guest_token` |
+| `answer_reports` | chat_message_id, user_id, guest_token, reason, note, status | Status: baru/proses/selesai |
 | `otp_codes` | user_id, code_hash, expires_at, attempts, consumed_at | Kode disimpan sebagai hash |
 | `audit_logs` | actor_id, action, subject_type, subject_id, meta, created_at | Metadata saja |
 | `bug_reports` | user_id, name, email, description, screenshot_path, status, admin_note | `user_id` boleh null |
-| `contact_messages` | user_id, subject, body, read_at | Wajib login |
+| `contact_messages` | user_id, name, email, subject, body, read_at | `user_id` null untuk tamu; nama+email diisi tamu |
 | `transactions` | user_id, order_id, plan, amount, days, status, payment_type, snap_token, snap_redirect_url, paid_at, expires_at, raw_response | Satu baris = satu percobaan bayar |
 
 Tabel bawaan Laravel yang dipakai: `password_reset_tokens`, `sessions`,
@@ -281,7 +284,9 @@ Tabel bawaan Laravel yang dipakai: `password_reset_tokens`, `sessions`,
 - Semua foreign key memakai `cascadeOnDelete`, kecuali `bug_reports.user_id`
   (`nullOnDelete`, karena laporan pengunjung tidak punya akun) dan
   `audit_logs.actor_id` (`nullOnDelete`, jejak audit tetap ada).
-- `answer_ratings` memiliki unique `(chat_message_id, user_id)`.
+- `answer_ratings` memiliki unique `(chat_message_id, user_id)` untuk akun.
+  Baris tamu memakai `guest_token`; penilaian ulang dilakukan lewat
+  `updateOrCreate`, sehingga satu tamu tetap punya satu nilai per jawaban.
 - `transactions.order_id` unik.
 - `regulations.slug` unik.
 
@@ -396,7 +401,7 @@ flowchart TD
 | Sesi | Session cookie Laravel, regenerasi saat login, CSRF token |
 | Login | Rate limit 5 percobaan per email+IP |
 | Admin | `role=admin` + OTP segar (30 menit), kode di-hash, maks 5 percobaan |
-| Otorisasi data | Query selalu dibatasi `user_id`; data orang lain → 404 |
+| Otorisasi data | Query dibatasi `user_id` (akun) atau `guest_token` (tamu); data aktor lain → 404 |
 | Unggahan | Validasi MIME/ukuran; nama berkas ditentukan server |
 | Integrasi AI | Token internal; FastAPI tidak diekspos publik |
 | Pembayaran | Signature webhook; tidak menyimpan data kartu |
@@ -497,15 +502,17 @@ flowchart TD
 - Menghapus akun beserta `business_profiles`, `chat_sessions` (dan pesannya),
   `answer_ratings`, `answer_reports`, `contact_messages`, dan `transactions`.
 - `bug_reports.user_id` menjadi null agar laporan tetap dapat ditindaklanjuti.
+- Data tamu (`user_id` null) tidak terpengaruh dan mengikuti retensi 30 hari.
 
 #### 4.2.3 Konsultasi AI (RF-05, RF-06, RF-23..RF-26)
 
 **RF-05 — Bertanya**
 
 - Input pertanyaan 3–1000 karakter.
-- Kuota gratis 5/hari, premium 100/hari.
+- Tamu: kuota 5/hari per cookie (30 hari), riwayat hanya terlihat dari cookie
+  yang sama. Akun gratis 5/hari, premium 100/hari.
 - Kuota dicek dan dipotong di server.
-- Throttle 10 pertanyaan/menit per pengguna.
+- Throttle 10 pertanyaan/menit per pengguna atau per IP untuk tamu.
 
 **RF-06 — Proses RAG**
 
@@ -514,18 +521,23 @@ flowchart TD
 - FastAPI menggabungkan hasil vektor (ChromaDB) dan kata kunci (`kb.sqlite3`),
   lalu memanggil LLM dengan prompt yang mewajibkan rujukan.
 - Jawaban disimpan bersama `sources` (maksimal 5) dan flag `degraded`.
-- Bila layanan gagal: jawaban fallback, `degraded=true`, kuota tidak dipotong.
+- Bila penyedia LLM membalas 429/5xx, FastAPI mencoba ulang lalu memakai
+  model/penyedia cadangan (`LLM_FALLBACK_*`) bila dikonfigurasi.
+- Bila layanan tetap gagal: jawaban fallback, `degraded=true`, kuota tidak
+  dipotong.
 
 **RF-23 — Riwayat**
 
-- Daftar sesi milik pengguna, 15 per halaman, terbaru lebih dulu.
+- Daftar sesi milik aktor (akun atau tamu via cookie), 15 per halaman,
+  terbaru lebih dulu.
 - Detail sesi bersifat read-only.
-- Sesi milik pengguna lain menghasilkan 404.
+- Sesi milik aktor lain menghasilkan 404.
 
 **RF-24 — Hapus riwayat**
 
-- Hapus satu sesi atau seluruh sesi milik pengguna.
+- Hapus satu sesi atau seluruh sesi milik aktor.
 - Pesan ikut terhapus melalui cascade.
+- Data tamu dihapus otomatis setelah 30 hari (`sibis:purge-guests`).
 
 **RF-25 — Nilai jawaban**
 
@@ -577,7 +589,8 @@ flowchart TD
 
 **RF-09 — Pesan ke admin**
 
-- Wajib login.
+- Terbuka untuk pengunjung; tamu wajib mengisi nama dan email agar dapat
+  dibalas. Pengguna login memakai nama/email akun.
 - Subjek maksimal 160 karakter; isi 10–3000 karakter.
 - Throttle 5 pesan/menit.
 
@@ -643,11 +656,11 @@ flowchart TD
 | UC-04 | Logout | Pengguna/Admin | Terpenuhi |
 | UC-05 | Reset password | Pengguna | Terpenuhi |
 | UC-06 | Hapus akun | Pengguna | Terpenuhi |
-| UC-07 | Bertanya ke AI | Pengguna | Terpenuhi |
-| UC-08 | Lihat riwayat | Pengguna | Terpenuhi |
-| UC-09 | Hapus riwayat | Pengguna | Terpenuhi |
-| UC-10 | Rating jawaban | Pengguna | Terpenuhi |
-| UC-11 | Lapor jawaban AI | Pengguna | Terpenuhi |
+| UC-07 | Bertanya ke AI | Pengguna/Tamu | Terpenuhi |
+| UC-08 | Lihat riwayat | Pengguna/Tamu | Terpenuhi |
+| UC-09 | Hapus riwayat | Pengguna/Tamu | Terpenuhi |
+| UC-10 | Rating jawaban | Pengguna/Tamu | Terpenuhi |
+| UC-11 | Lapor jawaban AI | Pengguna/Tamu | Terpenuhi |
 | UC-12 | Berlangganan premium | Pengguna | Terpenuhi |
 | UC-13 | Monitoring pembayaran | Admin | Terpenuhi |
 | UC-14 | Unggah dokumen hukum | Admin | Terpenuhi |
@@ -658,7 +671,7 @@ flowchart TD
 | UC-19 | Lihat company profile | Semua | Terpenuhi |
 | UC-20 | Lihat & cari kebijakan | Semua | Terpenuhi |
 | UC-21 | Laporkan bug | Pengunjung/Pengguna | Terpenuhi |
-| UC-22 | Kirim pesan ke admin | Pengguna | Terpenuhi |
+| UC-22 | Kirim pesan ke admin | Pengunjung/Pengguna | Terpenuhi |
 | UC-23 | Admin terima laporan bug | Admin | Terpenuhi |
 | UC-24 | Admin terima pesan user | Admin | Terpenuhi |
 | UC-25 | Hapus dokumen hukum | Admin | Terpenuhi |
@@ -669,8 +682,8 @@ flowchart TD
 
 | | |
 |---|---|
-| Aktor | Pengguna terverifikasi |
-| Prakondisi | Login, email terverifikasi, kuota hari ini > 0 |
+| Aktor | Pengguna terverifikasi atau tamu |
+| Prakondisi | Kuota hari ini > 0 (akun atau cookie tamu) |
 | Pascakondisi | Pertanyaan dan jawaban tersimpan; kuota berkurang bila jawaban normal |
 
 **Alur utama:**
@@ -805,7 +818,7 @@ flowchart TD
 
 | Aktor | Use case |
 |---|---|
-| Pengunjung | UC-01, UC-19, UC-20, UC-21 |
+| Pengunjung (tamu) | UC-01, UC-07..UC-11, UC-19..UC-22 |
 | Pengguna | UC-02, UC-04..UC-12, UC-19..UC-22 |
 | Admin | UC-03, UC-13..UC-18, UC-23..UC-25 |
 
@@ -817,7 +830,7 @@ flowchart TD
 |---|---|---|---|---|
 | NFR-01 | Availability | ≥ 99,5% waktu operasional | Deployment + monitoring; bukan properti kode | Perlu verifikasi deploy |
 | NFR-02 | Availability | 24×7 kecuali pemeliharaan | Scheduler dan health check tersedia | Perlu verifikasi deploy |
-| NFR-03 | Reliability | Crash/bug fatal ≤ 0,1%/bulan | 69 test otomatis, penanganan error terpusat | Sebagian, perlu observasi produksi |
+| NFR-03 | Reliability | Crash/bug fatal ≤ 0,1%/bulan | 75 test otomatis, penanganan error terpusat | Sebagian, perlu observasi produksi |
 | NFR-04 | Ergonomy | UI konsisten & intuitif | Design system Tailwind (kelas bersama), layout seragam | Terpenuhi |
 | NFR-05 | Ergonomy | Responsif seluler & desktop | Tailwind breakpoint `sm/md/lg`, target sentuh ≥ 44px | Terpenuhi |
 | NFR-06 | Portability | Chrome, Firefox, Edge, Safari | HTML/CSS/JS standar; tanpa API peramban eksklusif | Terpenuhi |
@@ -825,7 +838,7 @@ flowchart TD
 | NFR-08 | Response Time | Jawaban AI ≤ 10 detik | Timeout RAG dapat diatur; ambang lambat 10 detik dicatat | Perlu pengukuran |
 | NFR-09 | Security | Password Bcrypt/Argon2 | Cast `'password' => 'hashed'` | Terpenuhi |
 | NFR-10 | Security | HTTPS/TLS | HSTS saat request secure; TLS di reverse proxy | Perlu konfigurasi deploy |
-| NFR-11 | Security | Percakapan = data pribadi (UU PDP) | Data di DB milik pengguna; hapus akun cascade; PII diredaksi ke LLM | Terpenuhi |
+| NFR-11 | Security | Percakapan = data pribadi (UU PDP) | Data di DB milik akun/token tamu; hapus akun cascade; data tamu dihapus setelah 30 hari; PII diredaksi ke LLM | Terpenuhi |
 | NFR-12 | Accuracy | Anti-halusinasi + sumber | Prompt wajib merujuk konteks; `sources` disimpan; disclaimer | Terpenuhi (evaluasi berkala disarankan) |
 | NFR-13 | Availability | Gangguan LLM ≤ 0,5% | Fallback + health check; angka aktual tergantung penyedia | Perlu verifikasi deploy |
 | NFR-14 | Reliability | Error/timeout AI ≤ 1% | Timeout, fallback, metrik status per panggilan | Terpenuhi, perlu observasi |
@@ -855,16 +868,16 @@ infrastruktur dan tidak dapat dibuktikan hanya dari kode. Rincian ada di
 |---|---|---|
 | RF-01, RF-17 | `HomeController`, `AdminController@updateProfile`, `CompanyProfile` | `AdminOperationsTest` |
 | RF-02..RF-04 | `RegulationController`, `Regulation` | `CoreFlowTest` |
-| RF-05, RF-06 | `ConsultationController@ask`, `RagClient` | `CoreFlowTest`, `OperationsTest` |
+| RF-05, RF-06 | `ConsultationController@ask`, `RagClient` | `CoreFlowTest`, `GuestAccessTest`, `OperationsTest` |
 | RF-07 | `PremiumController`, `MidtransService`, `Transaction` | `PremiumTest` |
 | RF-08, RF-19 | `SupportController`, `AdminController@bugReports` | `SupportTest` |
-| RF-09, RF-20 | `SupportController`, `AdminController@messages` | `SupportTest` |
+| RF-09, RF-20 | `SupportController`, `AdminController@messages` | `SupportTest`, `GuestAccessTest` |
 | RF-10..RF-13 | Controller Breeze, `LoginRequest`, `OtpCode` | `Auth/*`, `CoreFlowTest` |
 | RF-14..RF-18, RF-27 | `AdminController` regulasi + `RagClient` | `AdminCmsTest`, `AdminOperationsTest` |
 | RF-21 | `AdminController@transactions` | `PremiumTest` |
 | RF-22 | `ProfileController@destroy` | `ProfileTest` |
-| RF-23, RF-24 | `ConsultationController@history/destroy` | `AdminOperationsTest`, `CoreFlowTest` |
-| RF-25, RF-26 | `ConsultationController@rate/report` | `CoreFlowTest`, `AdminOperationsTest` |
+| RF-23, RF-24 | `ConsultationController@history/destroy` | `AdminOperationsTest`, `CoreFlowTest`, `GuestAccessTest` |
+| RF-25, RF-26 | `ConsultationController@rate/report` | `CoreFlowTest`, `AdminOperationsTest`, `GuestAccessTest` |
 
 ### 7.2 NFR → bukti
 
@@ -946,7 +959,7 @@ memakai penomoran UC-01..UC-25 yang konsisten dengan matriks di Bagian 5.
 
 ### 9.1 Ringkasan pengujian otomatis
 
-- **69 test, 520 assertion, seluruhnya lulus.**
+- **75 test, 641 assertion, seluruhnya lulus.**
 - Dijalankan dengan `cd backend && php artisan test`.
 - Basis data uji: SQLite `:memory:` dengan `RefreshDatabase`; `BackupTest`
   sengaja tanpa transaksi karena `VACUUM INTO` tidak boleh berjalan di dalam
@@ -962,7 +975,8 @@ memakai penomoran UC-01..UC-25 yang konsisten dengan matriks di Bagian 5.
 | `Feature/CoreFlowTest` | Pencarian anti-injeksi, IDOR riwayat/penilaian, kuota degraded, lockout login, gerbang admin+OTP, register selalu `free`, halaman galat |
 | `Feature/AdminCmsTest` | Otorisasi admin, daftar pengguna, unggah+indeks PDF, validasi, indeks ulang, kategori, pencarian+paginasi, slug unik, ubah, hapus |
 | `Feature/AdminOperationsTest` | Hapus riwayat, CMS profil, tindak lanjut laporan jawaban, audit |
-| `Feature/SupportTest` | Lapor bug + screenshot, pesan admin, otorisasi kotak masuk |
+| `Feature/SupportTest` | Lapor bug + screenshot, pesan admin/tamu, otorisasi kotak masuk |
+| `Feature/GuestAccessTest` | Akses tamu, isolasi riwayat per cookie, kuota tamu, rating tamu, retensi 30 hari |
 | `Feature/PremiumTest` | Checkout, webhook, signature, aktivasi idempoten, kuota premium |
 | `Feature/OperationsTest` | Redaksi PII, metrik error, health check |
 | `Feature/BackupTest` | Snapshot + prune retensi |
@@ -972,7 +986,8 @@ memakai penomoran UC-01..UC-25 yang konsisten dengan matriks di Bagian 5.
 
 ### 9.2 Kriteria penerimaan utama
 
-1. Pengunjung dapat membaca kebijakan dan mengirim laporan bug tanpa akun.
+1. Pengunjung dapat membaca kebijakan, bertanya ke AI (kuota tamu), dan
+   mengirim laporan bug/pesan tanpa akun.
 2. Pengguna terverifikasi dapat bertanya, melihat sumber, dan kuotanya
    berkurang tepat satu per jawaban normal.
 3. Jawaban fallback tidak memotong kuota.
@@ -984,6 +999,8 @@ memakai penomoran UC-01..UC-25 yang konsisten dengan matriks di Bagian 5.
 8. Semua perubahan konten admin muncul di `/admin/audit`.
 9. Backup harian terbentuk dan backup lebih tua dari 30 hari terhapus.
 10. Tidak ada isi pertanyaan yang tercatat di log metrik.
+11. Percakapan tamu yang lebih tua dari 30 hari terhapus oleh
+    `sibis:purge-guests`; percakapan akun tidak tersentuh.
 
 ### 9.3 Pemeriksaan manual yang disarankan sebelum rilis
 

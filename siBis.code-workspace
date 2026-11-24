@@ -1,0 +1,63 @@
+{
+    "folders": [
+        {
+            "name": "siBis (root)",
+            "path": "."
+        },
+        {
+            "name": "frontend (Vue)",
+            "path": "frontend"
+        },
+        {
+            "name": "backend (Laravel)",
+            "path": "backend"
+        },
+        {
+            "name": "ai-service (FastAPI)",
+            "path": "ai-service"
+        },
+        {
+            "name": "docs",
+            "path": "docs"
+        }
+    ],
+    "settings": {
+        "files.exclude": {
+            "**/node_modules": true,
+            "**/vendor": true,
+            "**/.venv": true,
+            "**/__pycache__": true
+        },
+        "search.exclude": {
+            "**/node_modules": true,
+            "**/vendor": true,
+            "**/.venv": true,
+            "**/public/build": true
+        }
+    },
+    "tasks": {
+        "version": "2.0.0",
+        "tasks": [
+            {
+                "label": "frontend: dev",
+                "type": "shell",
+                "command": "npm --prefix frontend run dev",
+                "isBackground": true,
+                "problemMatcher": []
+            },
+            {
+                "label": "frontend: build",
+                "type": "shell",
+                "command": "npm --prefix frontend run build",
+                "problemMatcher": []
+            },
+            {
+                "label": "backend: serve",
+                "type": "shell",
+                "command": "cd backend && php artisan serve",
+                "isBackground": true,
+                "problemMatcher": []
+            }
+        ]
+    }
+}

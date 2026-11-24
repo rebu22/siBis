@@ -1,5 +1,5 @@
 <script setup>
-import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
+import PublicLayout from '@/Layouts/PublicLayout.vue';
 import { Head, router } from '@inertiajs/vue3';
 
 const props = defineProps({
@@ -17,7 +17,7 @@ function hapus() {
 </script>
 
 <template>
-    <AuthenticatedLayout>
+    <PublicLayout>
         <Head :title="session.title ?? 'Riwayat konsultasi'" />
 
         <template #header>
@@ -100,5 +100,5 @@ function hapus() {
                 </li>
             </ol>
         </div>
-    </AuthenticatedLayout>
+    </PublicLayout>
 </template>

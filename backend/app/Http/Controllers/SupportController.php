@@ -50,22 +50,40 @@ class SupportController extends Controller
             ->with('success', 'Laporan bug terkirim. Terima kasih sudah membantu kami.');
     }
 
-    /** UC-22: form pesan ke admin, hanya untuk pengguna yang sudah login. */
-    public function contactForm(): Response
+    /** UC-22: form pesan ke admin, terbuka untuk pengunjung (nama & email diminta). */
+    public function contactForm(Request $request): Response
     {
-        return Inertia::render('Support/Contact');
+        $user = $request->user();
+
+        return Inertia::render('Support/Contact', [
+            'defaults' => [
+                'name' => $user?->name ?? '',
+                'email' => $user?->email ?? '',
+            ],
+            'isGuest' => $user === null,
+        ]);
     }
 
     public function contactStore(Request $request): RedirectResponse
     {
+        $user = $request->user();
+
         $data = $request->validate([
+            'name' => [$user ? 'nullable' : 'required', 'string', 'max:120'],
+            'email' => [$user ? 'nullable' : 'required', 'email', 'max:160'],
             'subject' => ['required', 'string', 'max:160'],
             'body' => ['required', 'string', 'min:10', 'max:3000'],
         ]);
 
-        ContactMessage::create($data + ['user_id' => $request->user()->id]);
+        ContactMessage::create([
+            'user_id' => $user?->id,
+            'name' => $data['name'] ?? $user?->name,
+            'email' => $data['email'] ?? $user?->email,
+            'subject' => $data['subject'],
+            'body' => $data['body'],
+        ]);
 
         return redirect()->route('contact.create')
-            ->with('success', 'Pesan terkirim. Admin akan membalas lewat email terdaftar.');
+            ->with('success', 'Pesan terkirim. Admin akan membalas lewat email yang Anda isi.');
     }
 }

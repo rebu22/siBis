@@ -1,5 +1,5 @@
 <script setup>
-import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
+import PublicLayout from '@/Layouts/PublicLayout.vue';
 import { Head, Link, router } from '@inertiajs/vue3';
 
 defineProps({ sessions: { type: Object, required: true } });
@@ -21,7 +21,7 @@ function hapusSemua() {
 </script>
 
 <template>
-    <AuthenticatedLayout>
+    <PublicLayout>
         <Head title="Riwayat Konsultasi" />
 
         <template #header>
@@ -111,5 +111,5 @@ function hapusSemua() {
                 </template>
             </nav>
         </div>
-    </AuthenticatedLayout>
+    </PublicLayout>
 </template>

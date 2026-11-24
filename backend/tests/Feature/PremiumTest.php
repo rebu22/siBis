@@ -220,7 +220,13 @@ class PremiumTest extends TestCase
 
     public function test_halaman_premium_menampilkan_paket_dan_riwayat(): void
     {
-        $this->get('/premium')->assertRedirect(route('login'));
+        // Tamu boleh melihat halaman premium; pembelian tetap wajib akun.
+        $this->get('/premium')->assertOk()
+            ->assertInertia(fn (AssertableInertia $page) => $page
+                ->component('Premium/Index')
+                ->where('isGuest', true)
+                ->where('plan', 'free'));
+        $this->post('/premium')->assertRedirect(route('login'));
 
         $user = $this->user();
         $this->transaksi($user);

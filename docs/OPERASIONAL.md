@@ -11,12 +11,13 @@ satu cron:
 * * * * * cd /path/ke/siBis/backend && php artisan schedule:run >> /dev/null 2>&1
 ```
 
-Dua tugas yang berjalan:
+Tiga tugas yang berjalan:
 
 | Waktu | Perintah | Kegunaan |
 |---|---|---|
 | 02:30 setiap hari | `sibis:backup` | Backup database + prune retensi |
 | Setiap 5 menit | `sibis:health` | Cek database & layanan RAG |
+| 03:00 setiap hari | `sibis:purge-guests` | Hapus percakapan tamu > 30 hari (UU PDP) |
 
 ## 2. Backup (NFR-24)
 

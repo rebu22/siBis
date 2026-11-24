@@ -32,24 +32,46 @@ const company = computed(() => page.props.company);
                     >
                 </Link>
 
-                <nav class="flex items-center gap-6">
-                    <Link href="/kebijakan" class="nav-link">Kebijakan</Link>
-                    <Link href="/#layanan" class="nav-link">Layanan</Link>
-                    <Link href="/#biaya" class="nav-link">Biaya</Link>
+                <nav class="flex flex-wrap items-center gap-6">
+                    <Link
+                        :href="route('consultation.index')"
+                        :class="route().current('consultation.*') ? 'nav-link-active' : 'nav-link'"
+                        >Konsultasi</Link
+                    >
+                    <Link
+                        :href="route('history.index')"
+                        :class="route().current('history.*') ? 'nav-link-active' : 'nav-link'"
+                        >Riwayat</Link
+                    >
+                    <Link
+                        href="/kebijakan"
+                        :class="route().current('regulations.*') ? 'nav-link-active' : 'nav-link'"
+                        >Kebijakan</Link
+                    >
+                    <Link
+                        :href="route('premium.index')"
+                        :class="route().current('premium.*') ? 'nav-link-active' : 'nav-link'"
+                        >Premium</Link
+                    >
+                    <Link
+                        :href="route('contact.create')"
+                        :class="route().current('contact.*') ? 'nav-link-active' : 'nav-link'"
+                        >Bantuan</Link
+                    >
+                    <Link
+                        v-if="user?.role === 'admin'"
+                        :href="route('admin.dashboard')"
+                        :class="route().current('admin.*') ? 'nav-link-active' : 'nav-link'"
+                        >Admin</Link
+                    >
                 </nav>
 
                 <div class="flex items-center gap-4">
                     <template v-if="user">
-                        <Link :href="route('consultation.index')" class="nav-link"
-                            >Konsultasi</Link
-                        >
-                        <Link :href="route('history.index')" class="nav-link">Riwayat</Link>
-                        <Link
-                            v-if="user.role === 'admin'"
-                            :href="route('admin.dashboard')"
-                            class="nav-link"
-                            >Admin</Link
-                        >
+                        <span class="hidden text-body-sm font-medium text-slate-500 sm:inline">{{
+                            user.name
+                        }}</span>
+                        <Link :href="route('profile.edit')" class="nav-link">Profil</Link>
                         <Link
                             :href="route('logout')"
                             method="post"
@@ -99,6 +121,24 @@ const company = computed(() => page.props.company);
                 </div>
             </div>
         </div>
+
+        <header
+            v-if="$slots.header"
+            class="relative overflow-hidden border-b border-slate-200 bg-white"
+        >
+            <!-- Blob atmosfer: memberi kedalaman tanpa mengganggu keterbacaan. -->
+            <div
+                class="orb -left-24 -top-32 h-[400px] w-[400px] bg-indigo-200 opacity-40"
+                aria-hidden="true"
+            />
+            <div
+                class="orb -right-24 -top-40 h-[500px] w-[500px] bg-violet-200 opacity-30"
+                aria-hidden="true"
+            />
+            <div class="relative mx-auto max-w-7xl px-4 py-10 sm:px-6 sm:py-12">
+                <slot name="header" />
+            </div>
+        </header>
 
         <main>
             <slot />
@@ -180,7 +220,7 @@ const company = computed(() => page.props.company);
 
         <!-- Ikon chatbot kanan-bawah (wajib SRS 3.1) -->
         <Link
-            :href="user ? route('consultation.index') : route('login')"
+            :href="route('consultation.index')"
             class="btn-primary fixed bottom-6 right-6 z-40 shadow-button"
             aria-label="Buka konsultasi AI"
         >

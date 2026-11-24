@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /** UC-07..UC-09: satu baris = satu percakapan konsultasi milik satu user. */
-#[Fillable(['user_id', 'title'])]
+#[Fillable(['user_id', 'guest_token', 'title'])]
 class ChatSession extends Model
 {
     public function user(): BelongsTo

@@ -17,9 +17,11 @@ Aturan yang dipegang di sini:
 """
 
 import io
+import logging
 import os
 import re
 import sqlite3
+import time
 import uuid
 from typing import Any
 
@@ -30,12 +32,18 @@ INTERNAL_TOKEN = os.getenv("RAG_TOKEN", "")
 LLM_BASE_URL = os.getenv("LLM_BASE_URL", "")      # endpoint kompatibel OpenAI (termasuk Ollama/vLLM)
 LLM_API_KEY = os.getenv("LLM_API_KEY", "")
 LLM_MODEL = os.getenv("LLM_MODEL", "")
+# Jalur cadangan (opsional). Kosongkan base URL untuk memakai penyedia yang sama dengan model lain.
+LLM_FALLBACK_BASE_URL = os.getenv("LLM_FALLBACK_BASE_URL", "")
+LLM_FALLBACK_API_KEY = os.getenv("LLM_FALLBACK_API_KEY", "")
+LLM_FALLBACK_MODEL = os.getenv("LLM_FALLBACK_MODEL", "")
 CHROMA_PATH = os.getenv("CHROMA_PATH", "./chroma")
 COLLECTION = os.getenv("CHROMA_COLLECTION", "hukum_bisnis")
 KB_PATH = os.getenv("KB_PATH", "./kb.sqlite3")    # indeks kata kunci, di samping direktori Chroma
 TOP_K = int(os.getenv("RAG_TOP_K", "4"))
 
 DISCLAIMER = "Jawaban ini bersifat edukasi, bukan nasihat hukum untuk kasus tertentu."
+
+log = logging.getLogger("sibis.rag")
 
 app = FastAPI(title="siBis RAG", docs_url=None, redoc_url=None)
 
@@ -144,6 +152,19 @@ def _retrieve(question: str) -> list[dict[str, Any]]:
     return [hit for _, hit in sorted(ranked.values(), key=lambda e: -e[0])[:TOP_K]]
 
 
+def _routes() -> list[tuple[str, str, str]]:
+    """Jalur model berurutan: utama, lalu cadangan (penyedia lain atau model lain)."""
+    routes = [(LLM_BASE_URL, LLM_API_KEY, LLM_MODEL)]
+
+    if LLM_FALLBACK_MODEL:
+        routes.append((
+            LLM_FALLBACK_BASE_URL or LLM_BASE_URL,
+            LLM_FALLBACK_API_KEY or LLM_API_KEY,
+            LLM_FALLBACK_MODEL,
+        ))
+
+    return [route for route in routes if route[0] and route[2]]
+
 def _answer(question: str, history: list[Turn], sources: list[dict[str, Any]]) -> str:
     if not (LLM_BASE_URL and LLM_MODEL):
         raise HTTPException(status_code=503, detail="LLM belum dikonfigurasi")
@@ -171,15 +192,43 @@ def _answer(question: str, history: list[Turn], sources: list[dict[str, Any]]) -
     messages += [{"role": t.role, "content": t.content} for t in history if t.role in {"user", "assistant"}]
     messages.append({"role": "user", "content": f"KONTEKS:\n{context or '(kosong)'}\n\nPERTANYAAN: {question}"})
 
-    response = httpx.post(
-        f"{LLM_BASE_URL.rstrip('/')}/chat/completions",
-        headers={"Authorization": f"Bearer {LLM_API_KEY}"} if LLM_API_KEY else {},
-        json={"model": LLM_MODEL, "messages": messages, "temperature": 0.2, "max_tokens": 400},
-        timeout=60,
-    )
-    response.raise_for_status()
+    last_error: str = "tidak ada respons"
+    # Laravel memutus di RAG_TIMEOUT (60 dtk); berhenti sebelum itu agar jawaban cadangan tetap terkirim.
+    deadline = time.monotonic() + 45
 
-    return response.json()["choices"][0]["message"]["content"].strip()
+    # Penyedia gratis sering membalas 429/503 sesaat: coba ulang, lalu jalur cadangan.
+    for base_url, api_key, model in _routes():
+        for attempt in range(3):
+            if time.monotonic() >= deadline:
+                break
+            try:
+                response = httpx.post(
+                    f"{base_url.rstrip('/')}/chat/completions",
+                    headers={"Authorization": f"Bearer {api_key}"} if api_key else {},
+                    json={"model": model, "messages": messages, "temperature": 0.2, "max_tokens": 400},
+                    timeout=min(20.0, max(5.0, deadline - time.monotonic())),
+                )
+
+                if response.status_code in (429, 500, 502, 503, 504):
+                    last_error = f"{model}: HTTP {response.status_code} {response.text[:160]}"
+                    log.warning("LLM sibuk, percobaan %s: %s", attempt + 1, last_error)
+                    if attempt < 2:
+                        time.sleep(2 * (attempt + 1))
+                    continue
+
+                response.raise_for_status()
+
+                return response.json()["choices"][0]["message"]["content"].strip()
+            except httpx.HTTPStatusError as e:
+                last_error = f"{model}: HTTP {e.response.status_code} {e.response.text[:160]}"
+                break
+            except httpx.HTTPError as e:
+                last_error = f"{model}: {e!r}"
+                if attempt < 2:
+                    time.sleep(2 * (attempt + 1))
+
+    log.error("LLM gagal setelah percobaan ulang: %s", last_error)
+    raise HTTPException(status_code=503, detail="Model AI sedang sibuk. Coba lagi sebentar lagi.")
 
 
 def _llm_ok() -> bool:
@@ -201,7 +250,12 @@ def _llm_ok() -> bool:
 
 @app.get("/health")
 def health() -> dict[str, Any]:
-    return {"ok": True, "llm": _llm_ok(), "chroma": _collection() is not None}
+    return {
+        "ok": True,
+        "llm": _llm_ok(),
+        "fallback": bool(LLM_FALLBACK_MODEL or LLM_FALLBACK_BASE_URL),
+        "chroma": _collection() is not None,
+    }
 
 
 @app.post("/rag/ask")

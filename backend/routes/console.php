@@ -17,3 +17,8 @@ Schedule::command('sibis:backup')
 Schedule::command('sibis:health')
     ->everyFiveMinutes()
     ->withoutOverlapping();
+
+// Retensi data tamu (tanpa akun): 30 hari, sesuai kebijakan privasi.
+Schedule::command('sibis:purge-guests')
+    ->dailyAt('03:00')
+    ->withoutOverlapping();

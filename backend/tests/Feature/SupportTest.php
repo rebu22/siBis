@@ -166,15 +166,26 @@ class SupportTest extends TestCase
         $this->assertNull($pesan->fresh()->read_at);
     }
 
-    public function test_pesan_ke_admin_wajib_login(): void
+    public function test_pengunjung_bisa_mengirim_pesan_dengan_nama_dan_email(): void
     {
-        $this->get('/hubungi-admin')->assertRedirect(route('login'));
+        $this->get('/hubungi-admin')->assertOk();
+
         $this->post('/hubungi-admin', [
             'subject' => 'Tanpa akun',
-            'body' => 'Pesan ini seharusnya tidak masuk.',
-        ])->assertRedirect(route('login'));
+            'body' => 'Pesan tamu tanpa nama dan email.',
+        ])->assertSessionHasErrors(['name', 'email']);
 
-        $this->assertDatabaseCount('contact_messages', 0);
+        $this->post('/hubungi-admin', [
+            'name' => 'Tamu',
+            'email' => 'tamu@example.test',
+            'subject' => 'Tanpa akun',
+            'body' => 'Pesan dari pengunjung tanpa akun.',
+        ])->assertRedirect(route('contact.create'));
+
+        $this->assertDatabaseHas('contact_messages', [
+            'user_id' => null,
+            'email' => 'tamu@example.test',
+        ]);
     }
 
     public function test_pengguna_bisa_mengirim_pesan_dan_admin_menandainya_dibaca(): void

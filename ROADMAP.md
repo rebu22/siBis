@@ -26,6 +26,8 @@ urutan pengerjaan yang sudah dilalui, bukan rencana kosong.
 ## Fase 3 — Fitur inti
 - [x] Auth: register, login, logout, reset, hapus akun
 - [x] Konsultasi AI, riwayat, hapus riwayat, rating, lapor jawaban
+- [x] Mode tamu: konsultasi/riwayat/rating/lapor tanpa akun (cookie 30 hari,
+      kuota 5/hari, retensi otomatis)
 - [x] Premium: Midtrans Snap, webhook, aktivasi otomatis, monitoring admin
 - [x] CMS: unggah/ubah/hapus kebijakan PDF, edit profil perusahaan
 - [x] Publik: cari kebijakan, detail PDF
@@ -35,7 +37,8 @@ urutan pengerjaan yang sudah dilalui, bukan rencana kosong.
 - [x] Password hash, HTTPS/HSTS saat secure, security headers + CSP nonce
 - [x] Token internal Laravel ↔ FastAPI
 - [x] Anti-halusinasi: prompt wajib merujuk konteks + sitasi
-- [x] Fallback saat LLM mati tanpa memotong kuota
+- [x] Fallback saat LLM mati tanpa memotong kuota; retry + model/penyedia
+      cadangan saat 429/5xx
 - [x] Redaksi PII (email, telepon, NIK, NPWP) sebelum kirim ke LLM
 - [x] Audit log perubahan konten admin
 - [x] Metrik latensi/status LLM, health check, alerting ke log

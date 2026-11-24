@@ -1,5 +1,5 @@
 <script setup>
-import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
+import PublicLayout from '@/Layouts/PublicLayout.vue';
 import InputError from '@/Components/InputError.vue';
 import { Head, Link, router, useForm } from '@inertiajs/vue3';
 import { nextTick, ref, watch } from 'vue';
@@ -59,7 +59,7 @@ scrollDown();
 </script>
 
 <template>
-    <AuthenticatedLayout>
+    <PublicLayout>
         <Head title="Konsultasi Hukum Bisnis" />
 
         <template #header>
@@ -71,6 +71,12 @@ scrollDown();
                     </h1>
                     <p class="mt-2 text-body-sm text-slate-500">
                         Jawaban bersifat edukasi awal, bukan nasihat mengikat.
+                    </p>
+                    <p v-if="quota.plan === 'tamu'" class="mt-2 text-caption text-slate-500">
+                        Mode tamu: kuota 5 pertanyaan/hari, riwayat tersimpan 30 hari di
+                        browser ini. Setelah
+                        <Link :href="route('register')" class="link-quiet">daftar gratis</Link>,
+                        percakapan baru tersimpan di akun.
                     </p>
                 </div>
                 <p class="text-caption text-slate-500">
@@ -293,5 +299,5 @@ scrollDown();
                 </form>
             </div>
         </div>
-    </AuthenticatedLayout>
+    </PublicLayout>
 </template>

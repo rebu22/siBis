@@ -237,7 +237,7 @@ belum-lunas menjadi lunas. Webhook berulang tidak menambah masa aktif lagi.
 
 | Entitas | Peran |
 |---|---|
-| Pengunjung | Belum login; dapat membaca kebijakan, mendaftar, dan mengirim laporan bug |
+| Pengunjung | Belum login; dapat membaca kebijakan, konsultasi (mode tamu), mendaftar, dan mengirim laporan bug/pesan |
 | Pengguna | Akun terverifikasi; konsultasi, riwayat, premium, pesan admin |
 | Admin | Akun `role=admin` dengan OTP; mengelola konten dan menindaklanjuti laporan |
 | Midtrans | Payment gateway (Snap sandbox/produksi) |
@@ -249,10 +249,10 @@ belum-lunas menjadi lunas. Webhook berulang tidak menambah masa aktif lagi.
 |---|---|---|---|
 | D1 | `users` | Akun, role, plan, premium_until, kuota harian, two_factor_at | 1.0, 2.0, 4.0, 6.0 |
 | D2 | `business_profiles` | Nama usaha, jenis, kota | 1.0 |
-| D3 | `chat_sessions`, `chat_messages` | Sesi konsultasi, pesan, sumber, flag degraded | 2.0 |
+| D3 | `chat_sessions`, `chat_messages` | Sesi konsultasi (akun/tamu), pesan, sumber, flag degraded | 2.0 |
 | D4 | `regulations` | Metadata kebijakan, berkas PDF, `rag_doc_id` | 3.0, 6.0 |
 | D5 | `company_profiles` | Visi, misi, layanan, kontak publik | 3.0, 6.0 |
-| D6 | `answer_ratings`, `answer_reports` | Nilai 1–5, alasan laporan, status tindak lanjut | 2.0, 6.0 |
+| D6 | `answer_ratings`, `answer_reports` | Nilai 1–5, alasan laporan, status tindak lanjut (akun/tamu) | 2.0, 6.0 |
 | D7 | `transactions` | Order Midtrans, nominal, status, `paid_at`, respons mentah | 4.0, 6.0 |
 | D8 | `bug_reports`, `contact_messages` | Laporan bug + screenshot, pesan pengguna | 5.0, 6.0 |
 | D9 | `audit_logs`, `otp_codes` | Jejak perubahan konten, OTP admin (hash) | 1.0, 4.0, 6.0 |

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Transaction;
 use App\Services\MidtransService;
+use App\Support\GuestQuota;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -25,16 +26,16 @@ class PremiumController extends Controller
         $user = $request->user();
 
         return Inertia::render('Premium/Index', [
-            'plan' => $user->effectivePlan(),
-            'premiumUntil' => $user->premium_until?->toDateTimeString(),
-            'quota' => [
-                'remaining' => $user->quotaRemaining(),
-                'limit' => $user->dailyQuota(),
-            ],
+            'plan' => $user ? $user->effectivePlan() : 'free',
+            'premiumUntil' => $user?->premium_until?->toDateTimeString(),
+            'quota' => $user
+                ? ['remaining' => $user->quotaRemaining(), 'limit' => $user->dailyQuota()]
+                : ['remaining' => GuestQuota::remaining($request), 'limit' => GuestQuota::DAILY_LIMIT],
             'price' => (int) config('services.midtrans.premium_price'),
             'days' => (int) config('services.midtrans.premium_days'),
             'configured' => $midtrans->configured(),
-            'transactions' => $user->transactions()
+            'isGuest' => $user === null,
+            'transactions' => $user ? $user->transactions()
                 ->latest('id')
                 ->take(10)
                 ->get()
@@ -46,7 +47,7 @@ class PremiumController extends Controller
                     'payment_type' => $transaction->payment_type,
                     'paid_at' => $transaction->paid_at?->toDateTimeString(),
                     'created_at' => $transaction->created_at?->toDateTimeString(),
-                ]),
+                ]) : [],
         ]);
     }
 

@@ -1,10 +1,20 @@
 <script setup>
-import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
+import PublicLayout from '@/Layouts/PublicLayout.vue';
 import InputError from '@/Components/InputError.vue';
 import InputLabel from '@/Components/InputLabel.vue';
 import { Head, useForm } from '@inertiajs/vue3';
 
-const form = useForm({ subject: '', body: '' });
+const props = defineProps({
+    defaults: { type: Object, default: () => ({ name: '', email: '' }) },
+    isGuest: { type: Boolean, default: false },
+});
+
+const form = useForm({
+    name: props.defaults.name ?? '',
+    email: props.defaults.email ?? '',
+    subject: '',
+    body: '',
+});
 
 function kirim() {
     form.post(route('contact.store'), {
@@ -15,7 +25,7 @@ function kirim() {
 </script>
 
 <template>
-    <AuthenticatedLayout>
+    <PublicLayout>
         <Head title="Hubungi Admin" />
 
         <template #header>
@@ -23,7 +33,7 @@ function kirim() {
             <h1 class="mt-3 text-h-sm font-bold text-slate-900">Hubungi admin</h1>
             <p class="mt-2 max-w-2xl text-body-sm text-slate-500">
                 Sampaikan pertanyaan, saran, atau kendala non-teknis. Admin membaca
-                pesan di dasbor dan membalas lewat email terdaftar.
+                pesan di dasbor dan membalas lewat email yang kamu isi.
             </p>
         </template>
 
@@ -33,6 +43,35 @@ function kirim() {
                 @submit.prevent="kirim"
             >
                 <div class="grid gap-5">
+                    <div v-if="isGuest" class="grid gap-5 sm:grid-cols-2">
+                        <div>
+                            <InputLabel for="name" value="Nama" />
+                            <input
+                                id="name"
+                                v-model="form.name"
+                                type="text"
+                                class="input mt-2"
+                                maxlength="120"
+                                required
+                                placeholder="Nama kamu"
+                            />
+                            <InputError :message="form.errors.name" class="mt-2" />
+                        </div>
+                        <div>
+                            <InputLabel for="email" value="Email" />
+                            <input
+                                id="email"
+                                v-model="form.email"
+                                type="email"
+                                class="input mt-2"
+                                maxlength="160"
+                                required
+                                placeholder="nama@email.com"
+                            />
+                            <InputError :message="form.errors.email" class="mt-2" />
+                        </div>
+                    </div>
+
                     <div>
                         <InputLabel for="subject" value="Subjek" />
                         <input
@@ -73,5 +112,5 @@ function kirim() {
                 </div>
             </form>
         </div>
-    </AuthenticatedLayout>
+    </PublicLayout>
 </template>

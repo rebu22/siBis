@@ -13,9 +13,8 @@ defineProps({
 
 const company = computed(() => usePage().props.company);
 const user = computed(() => usePage().props.auth.user);
-const ctaHref = computed(() =>
-    user.value ? route('consultation.index') : route('register'),
-);
+// Tamu boleh langsung mencoba, tidak perlu daftar dulu.
+const ctaHref = computed(() => route('consultation.index'));
 
 const rupiah = new Intl.NumberFormat('id-ID', {
     style: 'currency',
@@ -306,7 +305,7 @@ const rupiah = new Intl.NumberFormat('id-ID', {
                             </li>
                         </ul>
                         <Link :href="ctaHref" class="btn-primary mt-8 w-full">
-                            {{ user ? 'Buka konsultasi' : 'Daftar gratis' }}
+                            {{ user ? 'Buka konsultasi' : 'Coba gratis' }}
                         </Link>
                     </div>
 
@@ -344,11 +343,8 @@ const rupiah = new Intl.NumberFormat('id-ID', {
                                 Pembayaran QRIS dan virtual account
                             </li>
                         </ul>
-                        <Link
-                            :href="user ? route('premium.index') : route('register')"
-                            class="btn-ghost mt-8 w-full"
-                        >
-                            {{ user ? 'Kelola langganan' : 'Daftar untuk berlangganan' }}
+                        <Link :href="route('premium.index')" class="btn-ghost mt-8 w-full">
+                            {{ user ? 'Kelola langganan' : 'Lihat paket premium' }}
                         </Link>
                         <p class="mt-3 text-caption text-slate-500">
                             Pembayaran diproses Midtrans. Aktivasi otomatis setelah pembayaran
@@ -421,7 +417,7 @@ const rupiah = new Intl.NumberFormat('id-ID', {
                     :href="ctaHref"
                     class="inline-flex shrink-0 items-center gap-2 rounded-full bg-white px-6 py-3 text-body-sm font-semibold text-indigo-900 shadow-soft transition-all duration-200 hover:-translate-y-0.5 hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-indigo-900"
                 >
-                    {{ user ? 'Buka konsultasi' : 'Daftar gratis' }}
+                    {{ user ? 'Buka konsultasi' : 'Tanya sekarang gratis' }}
                 </Link>
             </div>
         </section>

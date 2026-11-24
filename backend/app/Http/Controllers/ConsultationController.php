@@ -2,10 +2,13 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\AnswerRating;
 use App\Models\AnswerReport;
 use App\Models\ChatMessage;
 use App\Models\ChatSession;
 use App\Services\RagClient;
+use App\Support\GuestQuota;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -21,10 +24,10 @@ class ConsultationController extends Controller
     /** UC-08 / RF-06: selalu lanjut sesi terakhir; riwayat lengkap ada di halaman terpisah. */
     public function index(Request $request): Response
     {
-        $session = $request->user()->chatSessions()->latest('id')->first();
+        $session = $this->sessions($request)->latest('id')->first();
 
         return Inertia::render('Consultation/Index', [
-            'messages' => $session ? $this->thread($session, $request->user()->id) : [],
+            'messages' => $session ? $this->thread($session, $this->actor($request)) : [],
             'quota' => $this->quota($request),
         ]);
     }
@@ -39,11 +42,14 @@ class ConsultationController extends Controller
         ]);
 
         // NFR: kuota dihitung server-side; permintaan di luar kuota tidak dikirim ke LLM.
-        if ($user->quotaRemaining() < 1) {
-            return back()->with('error', 'Kuota konsultasi harian sudah habis. Coba lagi besok atau tingkatkan ke Premium.');
+        if ($this->quota($request)['remaining'] < 1) {
+            return back()->with('error', $user
+                ? 'Kuota konsultasi harian sudah habis. Coba lagi besok atau tingkatkan ke Premium.'
+                : 'Kuota tamu hari ini sudah habis. Daftar gratis untuk 5 pertanyaan baru setiap hari.');
         }
 
-        $session = $user->chatSessions()->latest('id')->first() ?? $user->chatSessions()->create([]);
+        $session = $this->sessions($request)->latest('id')->first()
+            ?? ChatSession::create($this->actor($request));
 
         // ponytail: jawaban gagal tidak boleh masuk konteks, model kecil menirunya sebagai jawaban sendiri.
         $history = $session->messages()->where('degraded', false)->latest('id')->take(self::HISTORY_TURNS)->get()->reverse()->values();
@@ -61,7 +67,7 @@ class ConsultationController extends Controller
 
         // NFR-17: jawaban degraded tidak menghabiskan kuota user.
         if (! $result['degraded']) {
-            $user->consumeQuota();
+            $user ? $user->consumeQuota() : GuestQuota::consume($request);
         }
 
         $session->title ??= Str::limit($data['question'], 60);
@@ -70,11 +76,11 @@ class ConsultationController extends Controller
         return back();
     }
 
-    /** UC-09 / RF-07: daftar percakapan milik user sendiri. */
+    /** UC-09 / RF-07: daftar percakapan milik aktor (akun atau tamu) sendiri. */
     public function history(Request $request): Response
     {
         return Inertia::render('History/Index', [
-            'sessions' => $request->user()->chatSessions()
+            'sessions' => $this->sessions($request)
                 ->withCount('messages')
                 ->latest('id')
                 ->paginate(15)
@@ -87,29 +93,29 @@ class ConsultationController extends Controller
         ]);
     }
 
-    /** UC-09: tampilan read-only. Sesi milik user lain => 404, bukan 403 (tidak membocorkan keberadaan data). */
+    /** UC-09: tampilan read-only. Sesi milik aktor lain => 404, bukan 403 (tidak membocorkan keberadaan data). */
     public function show(Request $request, int $session): Response
     {
-        $owned = $request->user()->chatSessions()->findOrFail($session);
+        $owned = $this->sessions($request)->findOrFail($session);
 
         return Inertia::render('History/Show', [
             'session' => ['id' => $owned->id, 'title' => $owned->title, 'created_at' => $owned->created_at?->toDateTimeString()],
-            'messages' => $this->thread($owned, $request->user()->id),
+            'messages' => $this->thread($owned, $this->actor($request)),
         ]);
     }
 
     /** RF-24 / UC-09: hapus satu percakapan milik sendiri (pesan ikut terhapus lewat cascade). */
     public function destroy(Request $request, int $session): RedirectResponse
     {
-        $request->user()->chatSessions()->findOrFail($session)->delete();
+        $this->sessions($request)->findOrFail($session)->delete();
 
         return redirect()->route('history.index')->with('success', 'Percakapan dihapus dari riwayat.');
     }
 
-    /** RF-24 / UC-09: hapus seluruh riwayat konsultasi milik user yang sedang login. */
+    /** RF-24 / UC-09: hapus seluruh riwayat konsultasi milik aktor yang sedang aktif. */
     public function destroyAll(Request $request): RedirectResponse
     {
-        $request->user()->chatSessions()->delete();
+        $this->sessions($request)->delete();
 
         return redirect()->route('history.index')->with('success', 'Seluruh riwayat konsultasi dihapus.');
     }
@@ -124,7 +130,7 @@ class ConsultationController extends Controller
             'comment' => ['nullable', 'string', 'max:500'],
         ]);
 
-        $target->ratings()->updateOrCreate(['user_id' => $request->user()->id], $data);
+        $target->ratings()->updateOrCreate($this->actor($request), $data);
 
         return back()->with('success', 'Terima kasih, penilaian Anda tersimpan.');
     }
@@ -139,9 +145,36 @@ class ConsultationController extends Controller
             'note' => ['nullable', 'string', 'max:500'],
         ]);
 
-        $target->reports()->create($data + ['user_id' => $request->user()->id]);
+        $target->reports()->create($data + $this->actor($request));
 
         return back()->with('success', 'Laporan terkirim. Tim kami akan meninjau jawaban ini.');
+    }
+
+    /**
+     * Identitas aktor: akun bila login, token cookie bila tamu.
+     *
+     * @return array{user_id?: int, guest_token?: string}
+     */
+    private function actor(Request $request): array
+    {
+        return $request->user()
+            ? ['user_id' => $request->user()->id]
+            : ['guest_token' => $this->guestToken($request)];
+    }
+
+    /** Sesi milik aktor; tamu hanya melihat sesi dengan tokennya sendiri. */
+    private function sessions(Request $request): Builder
+    {
+        $user = $request->user();
+
+        return $user
+            ? ChatSession::query()->where('user_id', $user->id)
+            : ChatSession::query()->whereNull('user_id')->where('guest_token', $this->guestToken($request));
+    }
+
+    private function guestToken(Request $request): string
+    {
+        return (string) $request->attributes->get('guest_token');
     }
 
     /** Semua akses jawaban disaring lewat kepemilikan sesi (anti-IDOR). */
@@ -149,15 +182,20 @@ class ConsultationController extends Controller
     {
         return ChatMessage::query()
             ->whereKey($message)
-            ->whereHas('session', fn ($query) => $query->where('user_id', $request->user()->id))
+            ->whereIn('chat_session_id', $this->sessions($request)->select('id'))
             ->firstOrFail();
     }
 
     /** @return array<int, array<string, mixed>> */
-    private function thread(ChatSession $session, int $userId): array
+    private function thread(ChatSession $session, array $actor): array
     {
         $messages = $session->messages()->with('ratings')->get();
-        $mine = fn (ChatMessage $message) => $message->ratings->firstWhere('user_id', $userId)?->score;
+
+        $mine = fn (ChatMessage $message) => $message->ratings
+            ->first(fn (AnswerRating $rating) => isset($actor['user_id'])
+                ? $rating->user_id === $actor['user_id']
+                : $rating->guest_token === $actor['guest_token'])
+            ?->score;
 
         return $messages->map(fn (ChatMessage $message) => [
             'id' => $message->id,
@@ -175,6 +213,14 @@ class ConsultationController extends Controller
     {
         $user = $request->user();
 
-        return ['remaining' => $user->quotaRemaining(), 'limit' => $user->dailyQuota(), 'plan' => $user->effectivePlan()];
+        if ($user) {
+            return ['remaining' => $user->quotaRemaining(), 'limit' => $user->dailyQuota(), 'plan' => $user->effectivePlan()];
+        }
+
+        return [
+            'remaining' => GuestQuota::remaining($request),
+            'limit' => GuestQuota::DAILY_LIMIT,
+            'plan' => 'tamu',
+        ];
     }
 }

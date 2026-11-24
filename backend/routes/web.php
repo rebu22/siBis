@@ -14,20 +14,17 @@ Route::get('/', [HomeController::class, 'index'])->name('home');
 Route::get('/kebijakan', [RegulationController::class, 'index'])->name('regulations.index');
 Route::get('/kebijakan/{regulation}', [RegulationController::class, 'show'])->name('regulations.show');
 
-// --- Bantuan (RF-08, RF-09) ---
+// --- Bantuan (RF-08, RF-09): terbuka untuk pengunjung, nama+email diminta bila tidak login. ---
 Route::get('/lapor-bug', [SupportController::class, 'bugForm'])->name('bug.create');
 Route::post('/lapor-bug', [SupportController::class, 'bugStore'])->middleware('throttle:5,1')->name('bug.store');
-
-Route::middleware('auth')->group(function () {
-    Route::get('/hubungi-admin', [SupportController::class, 'contactForm'])->name('contact.create');
-    Route::post('/hubungi-admin', [SupportController::class, 'contactStore'])->middleware('throttle:5,1')->name('contact.store');
-});
+Route::get('/hubungi-admin', [SupportController::class, 'contactForm'])->name('contact.create');
+Route::post('/hubungi-admin', [SupportController::class, 'contactStore'])->middleware('throttle:5,1')->name('contact.store');
 
 // Webhook Midtrans (RF-07): tanpa login, diverifikasi lewat signature.
 Route::post('/midtrans/notification', [PremiumController::class, 'notification'])->name('midtrans.notification');
 
-// --- Konsultasi AI (RF-05..RF-13, RF-25, RF-26) ---
-Route::middleware(['auth', 'verified'])->group(function () {
+// --- Konsultasi AI (RF-05..RF-13, RF-25, RF-26) + Premium: tamu boleh, user_id kosong. ---
+Route::middleware('guest-token')->group(function () {
     Route::get('/konsultasi', [ConsultationController::class, 'index'])->name('consultation.index');
     Route::post('/konsultasi', [ConsultationController::class, 'ask'])->middleware('throttle:consult')->name('consultation.ask');
 
@@ -40,6 +37,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/jawaban/{message}/lapor', [ConsultationController::class, 'report'])->name('answers.report');
 
     Route::get('/premium', [PremiumController::class, 'index'])->name('premium.index');
+});
+
+Route::middleware(['auth', 'verified'])->group(function () {
+    // Pembayaran tetap butuh akun: Midtrans butuh identitas pembeli + langganan disimpan ke user.
     Route::post('/premium', [PremiumController::class, 'checkout'])->middleware('throttle:6,1')->name('premium.checkout');
     Route::get('/premium/selesai', [PremiumController::class, 'finish'])->name('premium.finish');
 

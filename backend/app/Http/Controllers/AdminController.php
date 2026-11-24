@@ -200,7 +200,7 @@ class AdminController extends Controller
                 'reporter' => $report->user ? [
                     'name' => $report->user->name,
                     'email' => $report->user->email,
-                ] : null,
+                ] : ($report->guest_token ? ['name' => 'Tamu', 'email' => null] : null),
             ]);
 
         $summary = [];
@@ -332,7 +332,7 @@ class AdminController extends Controller
                 'sender' => $message->user ? [
                     'name' => $message->user->name,
                     'email' => $message->user->email,
-                ] : null,
+                ] : ($message->email ? ['name' => $message->name, 'email' => $message->email] : null),
             ]);
 
         return Inertia::render('Admin/Messages', [

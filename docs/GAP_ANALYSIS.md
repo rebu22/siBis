@@ -21,7 +21,7 @@ Status: `[x]` selesai · `[~]` sebagian · `[ ]` belum ada
 | RF-06 | Proses RAG | [x] | `RagClient` → FastAPI `/rag/ask`, sumber disimpan di `chat_messages.sources` |
 | RF-07 | Berlangganan Premium | [x] | `/premium` + Midtrans Snap (sandbox default), aktivasi otomatis via webhook/status API |
 | RF-08 | Laporkan bug | [x] | `/lapor-bug` (publik) + screenshot di disk `public/lapor-bug` |
-| RF-09 | Kirim pesan ke admin | [x] | `/hubungi-admin` (wajib login) + `ContactMessage` |
+| RF-09 | Kirim pesan ke admin | [x] | `/hubungi-admin` (publik; tamu isi nama+email) + `ContactMessage` |
 | RF-10 | Login + anti brute-force | [x] | `LoginRequest` + `RateLimiter` (5 percobaan) |
 | RF-11 | Logout | [x] | `AuthenticatedSessionController@destroy` |
 | RF-12 | Register + verifikasi email | [x] | `RegisteredUserController`, `MustVerifyEmail` |
